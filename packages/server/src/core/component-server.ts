@@ -4,6 +4,7 @@ import { join, resolve } from 'path';
 import type { ComponentContribution } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { providerModelsCache } from './cache.js';
+import { queryAll, safeJsonParse } from '../db/utils.js';
 
 const PLUGINS_DIR = join(process.cwd(), 'plugins');
 
@@ -26,7 +27,9 @@ export class ComponentServer {
     this.contributions.push(...normalized);
 
     this.persist(pluginName, normalized);
-    providerModelsCache.delete(`components:${pluginName}`);
+    // Use a dedicated cache-key namespace for components instead of reusing
+    // the provider-models cache key space.
+    providerModelsCache.delete(`__components__:${pluginName}`);
   }
 
   getManifest(): ComponentContribution[] {
@@ -84,33 +87,17 @@ export class ComponentServer {
   loadFromDatabase() {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM components ORDER BY created_at ASC');
-      if (result.length === 0) return;
-      const columns = result[0].columns;
-      this.contributions = result[0].values.map(row => {
-        const c: any = {};
-        columns.forEach((col, idx) => c[col] = row[idx]);
-        return {
-          type: c.type,
-          name: c.name,
-          src: c.src,
-          slot: c.slot,
-          metadata: safeJsonParse(c.metadata_json, {})
-        } as ComponentContribution;
-      });
+      const rows = queryAll<any>(db, 'SELECT * FROM components ORDER BY created_at ASC');
+      this.contributions = rows.map(c => ({
+        type: c.type,
+        name: c.name,
+        src: c.src,
+        slot: c.slot,
+        metadata: safeJsonParse(c.metadata_json, {})
+      }) as ComponentContribution);
     } catch (err) {
       console.error('loadFromDatabase 组件失败:', err);
     }
-  }
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
   }
 }
 

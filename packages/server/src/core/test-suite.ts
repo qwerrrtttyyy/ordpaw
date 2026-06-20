@@ -3,20 +3,16 @@ import type { TestSuite, TestCase, TestRun, TestRunResult, CreateTestSuiteReques
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { agentRuntime } from './agent-runtime.js';
 import { sessionManager } from './session.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 
 export class TestSuiteManager {
   listSuites(agentId?: string): TestSuite[] {
     try {
       const db = getDatabase();
-      let result;
-      if (agentId) {
-        result = db.exec('SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC', [agentId]);
-      } else {
-        result = db.exec('SELECT * FROM test_suites ORDER BY updated_at DESC');
-      }
-      if (result.length === 0) return [];
-      const columns = result[0].columns;
-      return result[0].values.map(row => this.rowToSuite(columns, row));
+      const rows = agentId
+        ? queryAll<any>(db, 'SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
+        : queryAll<any>(db, 'SELECT * FROM test_suites ORDER BY updated_at DESC');
+      return rows.map(row => this.rowToSuite(row));
     } catch (err) {
       console.error('listSuites 错误:', err);
       return [];
@@ -26,9 +22,8 @@ export class TestSuiteManager {
   getSuite(id: string): TestSuite | null {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM test_suites WHERE id = ?', [id]);
-      if (result.length === 0 || result[0].values.length === 0) return null;
-      return this.rowToSuite(result[0].columns, result[0].values[0]);
+      const row = queryOne<any>(db, 'SELECT * FROM test_suites WHERE id = ?', [id]);
+      return row ? this.rowToSuite(row) : null;
     } catch (err) {
       console.error('getSuite 错误:', err);
       return null;
@@ -217,22 +212,16 @@ export class TestSuiteManager {
   listRuns(suiteId: string): TestRun[] {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC', [suiteId]);
-      if (result.length === 0) return [];
-      const columns = result[0].columns;
-      return result[0].values.map(row => {
-        const r: any = {};
-        columns.forEach((col, idx) => r[col] = row[idx]);
-        return {
-          id: r.id,
-          suiteId: r.suite_id,
-          agentId: r.agent_id,
-          results: safeJsonParse(r.results_json, []),
-          passed: r.passed,
-          failed: r.failed,
-          createdAt: r.created_at
-        };
-      });
+      const rows = queryAll<any>(db, 'SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC', [suiteId]);
+      return rows.map(r => ({
+        id: r.id,
+        suiteId: r.suite_id,
+        agentId: r.agent_id,
+        results: safeJsonParse(r.results_json, []),
+        passed: r.passed,
+        failed: r.failed,
+        createdAt: r.created_at
+      }));
     } catch (err) {
       console.error('listRuns 错误:', err);
       return [];
@@ -290,18 +279,15 @@ export class TestSuiteManager {
   private getCase(id: string): TestCase | null {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM test_cases WHERE id = ?', [id]);
-      if (result.length === 0 || result[0].values.length === 0) return null;
-      return this.rowToCase(result[0].columns, result[0].values[0]);
+      const row = queryOne<any>(db, 'SELECT * FROM test_cases WHERE id = ?', [id]);
+      return row ? this.rowToCase(row) : null;
     } catch (err) {
       console.error('getCase 错误:', err);
       return null;
     }
   }
 
-  private rowToSuite(columns: string[], row: any[]): TestSuite {
-    const s: any = {};
-    columns.forEach((col, idx) => s[col] = row[idx]);
+  private rowToSuite(s: any): TestSuite {
     return {
       id: s.id,
       agentId: s.agent_id,
@@ -316,18 +302,15 @@ export class TestSuiteManager {
   private getSuiteCases(suiteId: string): TestCase[] {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC', [suiteId]);
-      if (result.length === 0) return [];
-      return result[0].values.map(row => this.rowToCase(result[0].columns, row));
+      const rows = queryAll<any>(db, 'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC', [suiteId]);
+      return rows.map(row => this.rowToCase(row));
     } catch (err) {
       console.error('getSuiteCases 错误:', err);
       return [];
     }
   }
 
-  private rowToCase(columns: string[], row: any[]): TestCase {
-    const c: any = {};
-    columns.forEach((col, idx) => c[col] = row[idx]);
+  private rowToCase(c: any): TestCase {
     return {
       id: c.id,
       suiteId: c.suite_id,
@@ -339,16 +322,6 @@ export class TestSuiteManager {
       createdAt: c.created_at,
       updatedAt: c.updated_at
     };
-  }
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
   }
 }
 

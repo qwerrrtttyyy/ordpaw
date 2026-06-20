@@ -1,11 +1,15 @@
 import { API } from '../api';
 import { Store } from '../store';
+import { t } from '../i18n';
+import { formatRelativeTime } from '../utils';
 
 export class ConversationsView {
   private api: API;
+  private store: Store;
 
-  constructor(api: API, _store: Store) {
+  constructor(api: API, store: Store) {
     this.api = api;
+    this.store = store;
   }
 
   async render() {
@@ -14,17 +18,18 @@ export class ConversationsView {
 
     const conversations = await this.api.getConversations();
     const agents = await this.api.getAgents();
+    const locale = this.store.getLocale();
 
     content.innerHTML = `
       <div class="slide-up">
         <div class="section-header">
           <div>
-            <div class="section-title">${conversations.length} 个会话</div>
-            <div class="text-sm text-muted mt-2">管理所有对话，支持检查点回滚</div>
+            <div class="section-title">${conversations.length} ${t('conversation.title')}</div>
+            <div class="text-sm text-muted mt-2">${t('conversation.subtitle') || '管理所有对话，支持检查点回滚'}</div>
           </div>
           <button class="btn btn-primary" id="createConvBtn">
             <span>＋</span>
-            <span>新建会话</span>
+            <span>${t('app.welcome.newConversation')}</span>
           </button>
         </div>
 
@@ -32,12 +37,12 @@ export class ConversationsView {
           <div class="card">
             <div class="empty-state">
               <div class="empty-state-icon">◈</div>
-              <div class="empty-state-title">还没有会话</div>
-              <div class="text-sm text-muted mb-4">选择一个 Agent 开始对话</div>
+              <div class="empty-state-title">${t('conversation.empty')}</div>
+              <div class="text-sm text-muted mb-4">${t('conversation.emptyHint') || '选择一个 Agent 开始对话'}</div>
               ${agents.length > 0 ? `
-                <button class="btn btn-primary" id="emptyCreateBtn">新建会话</button>
+                <button class="btn btn-primary" id="emptyCreateBtn">${t('app.welcome.newConversation')}</button>
               ` : `
-                <p class="text-sm text-muted">先创建 Agent 后才能新建会话</p>
+                <p class="text-sm text-muted">${t('conversation.createAgentFirst') || '先创建 Agent 后才能新建会话'}</p>
               `}
             </div>
           </div>
@@ -51,12 +56,12 @@ export class ConversationsView {
                   <div class="list-item-body">
                     <div class="list-item-title">${conv.title}</div>
                     <div class="list-item-meta">
-                      <span class="badge badge-accent badge-dot">${agent?.name || '未关联'}</span>
-                      <span>${this.formatTime(conv.updatedAt)}</span>
+                      <span class="badge badge-accent badge-dot">${agent?.name || (t('conversation.unlinked') || '未关联')}</span>
+                      <span>${formatRelativeTime(conv.updatedAt, locale)}</span>
                     </div>
                   </div>
                   <div class="list-item-actions">
-                    <button class="btn btn-ghost btn-sm delete-btn" data-id="${conv.id}">删除</button>
+                    <button class="btn btn-ghost btn-sm delete-btn" data-id="${conv.id}">${t('common.delete')}</button>
                   </div>
                 </div>
               `;
@@ -74,7 +79,7 @@ export class ConversationsView {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
-        if (id && confirm('确定删除此会话？所有消息和检查点都将丢失。')) {
+        if (id && confirm(t('conversation.deleteConfirm') || '确定删除此会话？所有消息和检查点都将丢失。')) {
           await this.api.deleteConversation(id);
           this.render();
         }
@@ -82,20 +87,9 @@ export class ConversationsView {
     });
   }
 
-  private formatTime(ts: number): string {
-    const date = new Date(ts);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    if (diff < 60_000) return '刚刚';
-    if (diff < 3600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-    if (diff < 86400_000) return `${Math.floor(diff / 3600_000)} 小时前`;
-    if (diff < 7 * 86400_000) return `${Math.floor(diff / 86400_000)} 天前`;
-    return date.toLocaleDateString('zh-CN');
-  }
-
   private showCreateModal(agents: any[]) {
     if (agents.length === 0) {
-      alert('请先创建 Agent');
+      alert(t('conversation.createAgentFirst') || '请先创建 Agent');
       return;
     }
     const overlay = document.createElement('div');
@@ -103,22 +97,22 @@ export class ConversationsView {
     overlay.innerHTML = `
       <div class="modal">
         <div class="modal-header">
-          <div class="modal-title">新建会话</div>
+          <div class="modal-title">${t('app.welcome.newConversation')}</div>
           <button class="modal-close" id="closeBtn">×</button>
         </div>
         <div class="form-group">
-          <label class="form-label">选择 Agent</label>
+          <label class="form-label">${t('conversation.selectAgent')}</label>
           <select class="select" id="agentSelect">
             ${agents.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
-          <label class="form-label">会话标题（可选）</label>
-          <input type="text" class="input" id="convTitle" placeholder="新会话">
+          <label class="form-label">${t('conversation.titleOptional') || '会话标题（可选）'}</label>
+          <input type="text" class="input" id="convTitle" placeholder="${t('conversation.newSession') || '新会话'}">
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" id="cancelBtn">取消</button>
-          <button class="btn btn-primary" id="confirmBtn">创建</button>
+          <button class="btn btn-secondary" id="cancelBtn">${t('common.cancel')}</button>
+          <button class="btn btn-primary" id="confirmBtn">${t('common.create')}</button>
         </div>
       </div>
     `;
@@ -132,7 +126,7 @@ export class ConversationsView {
     });
     overlay.querySelector('#confirmBtn')?.addEventListener('click', async () => {
       const agentId = (overlay.querySelector('#agentSelect') as HTMLSelectElement)?.value;
-      const title = (overlay.querySelector('#convTitle') as HTMLInputElement)?.value || '新会话';
+      const title = (overlay.querySelector('#convTitle') as HTMLInputElement)?.value || (t('conversation.newSession') || '新会话');
       if (agentId) {
         await this.api.createConversation(agentId, title);
         close();

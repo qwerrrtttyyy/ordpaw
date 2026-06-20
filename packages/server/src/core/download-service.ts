@@ -10,6 +10,7 @@ import { getDatabase } from '../db/index.js';
 import { skillRunner } from './skill-runner.js';
 import { scriptMcp } from './script-mcp.js';
 import { asyncHandler, ApiError, validateBody } from '../middleware.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -199,11 +200,10 @@ async function getResourcePayload(type: DownloadResourceType, id?: string): Prom
   switch (type) {
     case 'conversation': {
       if (!id) throw ApiError.badRequest('缺少 id 参数');
-      const convResult = db.exec('SELECT * FROM conversations WHERE id = ?', [id]);
-      if (convResult.length === 0) throw ApiError.notFound('会话不存在');
-      const conv = rowToObject(convResult[0].columns, convResult[0].values[0]);
-      const messages = queryAll(db, 'SELECT * FROM messages WHERE conversation_id = ?', [id]);
-      const checkpoints = queryAll(db, 'SELECT * FROM checkpoints WHERE conversation_id = ?', [id]);
+      const conv = queryOne<any>(db, 'SELECT * FROM conversations WHERE id = ?', [id]);
+      if (!conv) throw ApiError.notFound('会话不存在');
+      const messages = queryAll<any>(db, 'SELECT * FROM messages WHERE conversation_id = ?', [id]);
+      const checkpoints = queryAll<any>(db, 'SELECT * FROM checkpoints WHERE conversation_id = ?', [id]);
       const data = { version: 1, exportedAt: Date.now(), scope: 'conversation', conversation: conv, messages, checkpoints };
       return { filename: `conversation-${id}.json`, content: JSON.stringify(data, null, 2) };
     }
@@ -226,14 +226,13 @@ async function getResourcePayload(type: DownloadResourceType, id?: string): Prom
 
     case 'mcp': {
       if (id) {
-        const agentResult = db.exec('SELECT * FROM agents WHERE id = ?', [id]);
-        if (agentResult.length === 0) throw ApiError.notFound('Agent 不存在');
-        const agent = rowToObject(agentResult[0].columns, agentResult[0].values[0]);
+        const agent = queryOne<any>(db, 'SELECT * FROM agents WHERE id = ?', [id]);
+        if (!agent) throw ApiError.notFound('Agent 不存在');
         const configs = safeJsonParse(agent.mcp_json, []);
         return { filename: `mcp-${id}.json`, content: JSON.stringify(configs, null, 2) };
       }
-      const allAgents = queryAll(db, 'SELECT id, name, mcp_json FROM agents');
-      const configs = allAgents.map((a: any) => ({ agentId: a.id, name: a.name, mcpServers: safeJsonParse(a.mcp_json, []) }));
+      const allAgents = queryAll<any>(db, 'SELECT id, name, mcp_json FROM agents');
+      const configs = allAgents.map(a => ({ agentId: a.id, name: a.name, mcpServers: safeJsonParse(a.mcp_json, []) }));
       return { filename: 'mcp-configs.json', content: JSON.stringify(configs, null, 2) };
     }
 
@@ -336,40 +335,8 @@ function getDirectorySize(dir: string): number {
   }
 }
 
-function queryAll(db: any, sql: string, params?: any[]): any[] {
-  const result = params ? db.exec(sql, params) : db.exec(sql);
-  if (result.length === 0) return [];
-  return result[0].values.map((row: any[]) => rowToObject(result[0].columns, row));
-}
-
-function rowToObject(columns: string[], row: any[]): any {
-  const obj: any = {};
-  columns.forEach((col, idx) => {
-    obj[col] = row[idx];
-  });
-  return obj;
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
 function sanitizeFileName(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.\u4e00-\u9fa5-]/g, '_');
-}
-
-function isPaused(record: ServerTaskRecord): boolean {
-  return record.statusControl === 'paused';
-}
-
-function isCancelled(record: ServerTaskRecord): boolean {
-  return record.statusControl === 'cancelled';
 }
 
 function sleep(ms: number): Promise<void> {

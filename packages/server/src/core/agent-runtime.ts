@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Agent, Message } from '@ordpaw/shared';
+import type { Agent, Message, Provider } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { sessionManager } from './session.js';
 import { checkpointManager } from './checkpoint.js';
@@ -7,6 +7,129 @@ import { eventBus } from './event-bus.js';
 import { debugLogger } from './debug-logger.js';
 import { providerService } from './provider-service.js';
 import { agentCache } from './cache.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+
+/**
+ * Resolve the effective API key for a provider.
+ * Strategy: prefer the provider's own `apiKey`; fall back to the named key
+ * in global settings.apiKeys[apiKeyName]; finally fall back to env var
+ * ORDPAW_API_KEY_<TYPE>.
+ */
+function resolveApiKey(provider: Provider | null, settingsApiKeys: Record<string, string>): string {
+  if (provider?.apiKey) return provider.apiKey;
+  if (provider?.apiKeyName && settingsApiKeys[provider.apiKeyName]) {
+    return settingsApiKeys[provider.apiKeyName];
+  }
+  const envKey = provider ? `ORDPAW_API_KEY_${provider.type.toUpperCase()}` : '';
+  if (envKey && process.env[envKey]) return process.env[envKey] as string;
+  return '';
+}
+
+/**
+ * Build a chat-completion request body in OpenAI-compatible shape.
+ * Anthropic is handled separately via its Messages API.
+ */
+function buildOpenAIMessages(systemPrompt: string, messages: Message[]): Array<{ role: string; content: string }> {
+  const out: Array<{ role: string; content: string }> = [];
+  if (systemPrompt) out.push({ role: 'system', content: systemPrompt });
+  for (const m of messages) {
+    if (m.role === 'system' && out.length > 0 && out[0].role === 'system') continue; // avoid dup
+    out.push({ role: m.role, content: m.content });
+  }
+  return out;
+}
+
+/**
+ * Call an OpenAI-compatible /v1/chat/completions endpoint and return the
+ * assistant text. Returns null on failure (caller falls back to mock).
+ */
+async function callOpenAICompatible(opts: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+}): Promise<string | null> {
+  const url = opts.baseUrl.replace(/\/+$/, '') + '/v1/chat/completions';
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {})
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        messages: opts.messages,
+        stream: false
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      debugLogger.log('error', `OpenAI-compatible call failed: ${res.status} ${text.slice(0, 200)}`, 'agent-runtime');
+      return null;
+    }
+    const data: any = await res.json();
+    return data?.choices?.[0]?.message?.content ?? '';
+  } catch (err: any) {
+    debugLogger.log('error', `OpenAI-compatible fetch error: ${err.message}`, 'agent-runtime');
+    return null;
+  }
+}
+
+/**
+ * Call Anthropic Messages API (v1/messages) and return the assistant text.
+ */
+async function callAnthropic(opts: {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  systemPrompt: string;
+  messages: Array<{ role: string; content: string }>;
+}): Promise<string | null> {
+  const url = opts.baseUrl.replace(/\/+$/, '') + '/v1/messages';
+  // Anthropic only accepts user/assistant roles in messages
+  const filtered = opts.messages.filter(m => m.role === 'user' || m.role === 'assistant');
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': opts.apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: opts.model,
+        system: opts.systemPrompt,
+        messages: filtered,
+        max_tokens: 2048
+      })
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      debugLogger.log('error', `Anthropic call failed: ${res.status} ${text.slice(0, 200)}`, 'agent-runtime');
+      return null;
+    }
+    const data: any = await res.json();
+    return data?.content?.map((c: any) => c.text).join('') ?? '';
+  } catch (err: any) {
+    debugLogger.log('error', `Anthropic fetch error: ${err.message}`, 'agent-runtime');
+    return null;
+  }
+}
+
+/**
+ * Load the global Settings.apiKeys map from the settings table.
+ */
+function loadSettingsApiKeys(): Record<string, string> {
+  try {
+    const db = getDatabase();
+    const row = queryOne<{ key: string; value_json: string }>(db, "SELECT value_json FROM settings WHERE key = 'apiKeys'");
+    if (!row) return {};
+    return safeJsonParse<Record<string, string>>(row.value_json, {});
+  } catch {
+    return {};
+  }
+}
 
 export class AgentRuntime {
   async processMessage(conversationId: string, userMessage: string): Promise<Message | null> {
@@ -26,21 +149,44 @@ export class AgentRuntime {
     // 添加用户消息
     const userMsg = sessionManager.addMessage(conversationId, 'user', userMessage);
 
-    // 构建系统提示词
     const systemPrompt = agent.systemPrompt || 'You are a helpful AI assistant.';
-
-    // 解析服务商信息
     const provider = providerService.getProvider(agent.providerId);
-    const providerName = provider?.name || agent.providerId;
+    const apiKey = resolveApiKey(provider, loadSettingsApiKeys());
 
-    // TODO: 这里应该调用实际的 LLM API
-    // 目前是模拟响应，但已带上服务商/模型信息用于调试展示
-    const assistantContent = `[模拟响应] 收到消息: "${userMessage}"\n\nAgent: ${agent.name}\n服务商: ${providerName}\n模型: ${agent.model}\n系统提示: ${systemPrompt.substring(0, 100)}...`;
+    let assistantContent: string;
+    if (provider && apiKey) {
+      const history = sessionManager.getConversation(conversationId)?.messages ?? [userMsg];
+      const openaiMessages = buildOpenAIMessages(systemPrompt, history);
+
+      let llmText: string | null = null;
+      if (provider.type === 'anthropic') {
+        const baseUrl = provider.baseUrl || 'https://api.anthropic.com';
+        llmText = await callAnthropic({
+          baseUrl, apiKey, model: agent.model, systemPrompt, messages: openaiMessages.filter(m => m.role !== 'system')
+        });
+      } else if (provider.type === 'openai' || provider.type === 'custom' || provider.type === 'ollama') {
+        const baseUrl = provider.baseUrl || (provider.type === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com');
+        llmText = await callOpenAICompatible({ baseUrl, apiKey, model: agent.model, messages: openaiMessages });
+      }
+
+      if (llmText && llmText.trim()) {
+        assistantContent = llmText;
+        debugLogger.log('info', `LLM response received: conversation=${conversationId}, provider=${provider.name}, model=${agent.model}, len=${llmText.length}`, 'agent-runtime');
+      } else {
+        assistantContent = `[OrdPaw] LLM 调用失败或返回空，使用降级响应。Agent: ${agent.name}, Provider: ${provider.name}, Model: ${agent.model}\n\n收到消息: "${userMessage}"`;
+        debugLogger.log('warn', `LLM call returned empty, using fallback`, 'agent-runtime');
+      }
+    } else {
+      // 没有 provider 或 apiKey —— 降级为占位响应，但带明确的诊断信息
+      const reason = !provider ? `provider not found (${agent.providerId})` : 'missing API key';
+      assistantContent = `[OrdPaw 降级响应] 原因: ${reason}\n\nAgent: ${agent.name}\n服务商: ${provider?.name ?? agent.providerId}\n模型: ${agent.model}\n\n用户消息: ${userMessage}`;
+      debugLogger.log('warn', `Using fallback response: ${reason}`, 'agent-runtime');
+    }
 
     // 添加助手消息
     const assistantMsg = sessionManager.addMessage(conversationId, 'assistant', assistantContent);
 
-    debugLogger.log('info', `processMessage done: conversation=${conversationId}, provider=${providerName}, model=${agent.model}`, 'agent-runtime');
+    debugLogger.log('info', `processMessage done: conversation=${conversationId}`, 'agent-runtime');
 
     // 触发 message:after 事件
     await eventBus.emit('message:after', { conversationId, message: assistantMsg });
@@ -61,15 +207,8 @@ export class AgentRuntime {
 
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM agents WHERE id = ?', [id]);
-      if (result.length === 0 || result[0].values.length === 0) return null;
-
-      const row = result[0].values[0];
-      const columns = result[0].columns;
-      const agent: any = {};
-      columns.forEach((col, idx) => {
-        agent[col] = row[idx];
-      });
+      const agent = queryOne<any>(db, 'SELECT * FROM agents WHERE id = ?', [id]);
+      if (!agent) return null;
 
       const parsed: Agent = {
         id: agent.id,
@@ -115,28 +254,19 @@ export class AgentRuntime {
   listAgents(): Agent[] {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM agents ORDER BY updated_at DESC');
-      if (result.length === 0) return [];
-
-      const columns = result[0].columns;
-      return result[0].values.map(row => {
-        const agent: any = {};
-        columns.forEach((col, idx) => {
-          agent[col] = row[idx];
-        });
-        return {
-          id: agent.id,
-          name: agent.name,
-          description: agent.description,
-          systemPrompt: agent.system_prompt,
-          providerId: agent.provider_id || 'openai',
-          model: agent.model,
-          skills: safeJsonParse(agent.skills_json, []),
-          mcpServers: safeJsonParse(agent.mcp_json, []),
-          createdAt: agent.created_at,
-          updatedAt: agent.updated_at
-        };
-      });
+      const rows = queryAll<any>(db, 'SELECT * FROM agents ORDER BY updated_at DESC');
+      return rows.map(agent => ({
+        id: agent.id,
+        name: agent.name,
+        description: agent.description,
+        systemPrompt: agent.system_prompt,
+        providerId: agent.provider_id || 'openai',
+        model: agent.model,
+        skills: safeJsonParse(agent.skills_json, []),
+        mcpServers: safeJsonParse(agent.mcp_json, []),
+        createdAt: agent.created_at,
+        updatedAt: agent.updated_at
+      }));
     } catch (err) {
       console.error('listAgents 错误:', err);
       return [];
@@ -205,16 +335,6 @@ export class AgentRuntime {
       console.error('deleteAgent 错误:', err);
       return false;
     }
-  }
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
   }
 }
 

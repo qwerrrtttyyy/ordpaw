@@ -5,8 +5,9 @@ import { join } from 'path';
 const dataDir = join(process.cwd(), 'data');
 mkdirSync(dataDir, { recursive: true });
 
-const dbPath = join(dataDir, 'agent-studio.db');
-const tempDbPath = join(dataDir, 'agent-studio.db.tmp');
+const dbPath = join(dataDir, 'ordpaw.db');
+const tempDbPath = join(dataDir, 'ordpaw.db.tmp');
+const legacyDbPath = join(dataDir, 'agent-studio.db');
 
 let db: Database | null = null;
 let saveTimer: NodeJS.Timeout | null = null;
@@ -23,6 +24,16 @@ export async function initDatabase(): Promise<Database> {
       db = new SQL.Database(buffer);
     } catch (err) {
       console.error('数据库文件读取失败，创建新数据库:', err);
+      db = new SQL.Database();
+    }
+  } else if (existsSync(legacyDbPath)) {
+    // Migrate legacy DB file (project was renamed from Agent Studio → OrdPaw)
+    try {
+      const buffer = readFileSync(legacyDbPath);
+      db = new SQL.Database(buffer);
+      console.log('📦 已加载旧版 agent-studio.db，将写入新的 ordpaw.db');
+    } catch (err) {
+      console.error('旧数据库文件读取失败，创建新数据库:', err);
       db = new SQL.Database();
     }
   } else {

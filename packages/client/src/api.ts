@@ -1,320 +1,267 @@
 import type { Agent, Conversation, PromptTemplate, PluginInstance, Settings, Script, ScriptExecutionResult, Provider, TestSuite, TestRun, TestCase, DebugLogEntry, DebugEventEntry, ComponentContribution, DownloadResourceType, DownloadTask, ServerDownloadRequest } from '@ordpaw/shared';
 
+/**
+ * Unified fetch wrapper that:
+ * 1. Always sets JSON content-type for bodies.
+ * 2. Throws an ApiError on !res.ok with the server-provided message if any.
+ * 3. Returns parsed JSON for JSON responses, blob for blob responses.
+ */
+async function request<T = any>(
+  url: string,
+  options: RequestInit = {},
+  expect: 'json' | 'blob' | 'void' = 'json'
+): Promise<T> {
+  const headers: Record<string, string> = {
+    ...(options.headers as Record<string, string> || {})
+  };
+  if (options.body && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json';
+  }
+  const res = await fetch(url, { ...options, headers });
+  if (!res.ok) {
+    let msg = `${res.status} ${res.statusText}`;
+    let details: any;
+    try {
+      const ct = res.headers.get('content-type') || '';
+      if (ct.includes('application/json')) {
+        const body = await res.json();
+        msg = body?.error || body?.message || msg;
+        details = body?.details;
+      } else {
+        const text = await res.text();
+        if (text) msg = `${msg}: ${text.slice(0, 200)}`;
+      }
+    } catch { /* ignore parse error */ }
+    const err = new Error(`[API ${res.status}] ${msg}`) as Error & { status?: number; details?: any };
+    err.status = res.status;
+    err.details = details;
+    throw err;
+  }
+  if (expect === 'blob') return res.blob() as unknown as T;
+  if (expect === 'void') return undefined as unknown as T;
+  // Some endpoints (DELETE) return 200 with empty body; tolerate that.
+  const ct = res.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) return undefined as unknown as T;
+  const text = await res.text();
+  if (!text) return undefined as unknown as T;
+  return JSON.parse(text) as T;
+}
+
 export class API {
   private baseUrl = '/api';
 
+  private url(path: string): string {
+    return `${this.baseUrl}${path}`;
+  }
+
   // Agent API
   async getAgents(): Promise<Agent[]> {
-    const res = await fetch(`${this.baseUrl}/agents`);
-    return res.json();
+    return request<Agent[]>(this.url('/agents'));
   }
 
   async createAgent(data: Partial<Agent>): Promise<Agent> {
-    const res = await fetch(`${this.baseUrl}/agents`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<Agent>(this.url('/agents'), { method: 'POST', body: JSON.stringify(data) });
   }
 
   async getAgent(id: string): Promise<Agent> {
-    const res = await fetch(`${this.baseUrl}/agents/${id}`);
-    return res.json();
+    return request<Agent>(this.url(`/agents/${id}`));
   }
 
   async updateAgent(id: string, data: Partial<Agent>): Promise<Agent> {
-    const res = await fetch(`${this.baseUrl}/agents/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<Agent>(this.url(`/agents/${id}`), { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteAgent(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/agents/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/agents/${id}`), { method: 'DELETE' }, 'void');
   }
 
   // Conversation API
   async getConversations(agentId?: string): Promise<Conversation[]> {
-    const url = agentId ? `${this.baseUrl}/conversations?agentId=${agentId}` : `${this.baseUrl}/conversations`;
-    const res = await fetch(url);
-    return res.json();
+    const url = agentId ? this.url(`/conversations?agentId=${encodeURIComponent(agentId)}`) : this.url('/conversations');
+    return request<Conversation[]>(url);
   }
 
   async createConversation(agentId: string, title?: string): Promise<Conversation> {
-    const res = await fetch(`${this.baseUrl}/conversations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ agentId, title })
-    });
-    return res.json();
+    return request<Conversation>(this.url('/conversations'), { method: 'POST', body: JSON.stringify({ agentId, title }) });
   }
 
   async getConversation(id: string): Promise<Conversation> {
-    const res = await fetch(`${this.baseUrl}/conversations/${id}`);
-    return res.json();
+    return request<Conversation>(this.url(`/conversations/${id}`));
   }
 
   async deleteConversation(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/conversations/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/conversations/${id}`), { method: 'DELETE' }, 'void');
   }
 
   async sendMessage(conversationId: string, content: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversationId, content })
-    });
-    return res.json();
+    return request(this.url('/chat'), { method: 'POST', body: JSON.stringify({ conversationId, content }) });
   }
 
   // Prompt API
   async getPrompts(): Promise<PromptTemplate[]> {
-    const res = await fetch(`${this.baseUrl}/prompts`);
-    return res.json();
+    return request<PromptTemplate[]>(this.url('/prompts'));
   }
 
   async createPrompt(data: Partial<PromptTemplate>): Promise<PromptTemplate> {
-    const res = await fetch(`${this.baseUrl}/prompts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<PromptTemplate>(this.url('/prompts'), { method: 'POST', body: JSON.stringify(data) });
   }
 
   async updatePrompt(id: string, data: Partial<PromptTemplate>): Promise<PromptTemplate> {
-    const res = await fetch(`${this.baseUrl}/prompts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<PromptTemplate>(this.url(`/prompts/${id}`), { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deletePrompt(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/prompts/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/prompts/${id}`), { method: 'DELETE' }, 'void');
   }
 
   // Plugin API
   async getPlugins(): Promise<PluginInstance[]> {
-    const res = await fetch(`${this.baseUrl}/plugins`);
-    return res.json();
+    return request<PluginInstance[]>(this.url('/plugins'));
   }
 
   async installPlugin(data: any): Promise<PluginInstance> {
-    const res = await fetch(`${this.baseUrl}/plugins/install`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<PluginInstance>(this.url('/plugins/install'), { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updatePluginConfig(id: string, config: Record<string, any>): Promise<void> {
+    await request<void>(this.url(`/plugins/${id}/config`), { method: 'PUT', body: JSON.stringify({ config }) }, 'void');
   }
 
   async deletePlugin(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/plugins/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/plugins/${id}`), { method: 'DELETE' }, 'void');
   }
 
   // Settings API
   async getSettings(): Promise<Settings> {
-    const res = await fetch(`${this.baseUrl}/settings`);
-    return res.json();
+    return request<Settings>(this.url('/settings'));
   }
 
   async updateSettings(data: Partial<Settings>): Promise<void> {
-    await fetch(`${this.baseUrl}/settings`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
+    await request<void>(this.url('/settings'), { method: 'PUT', body: JSON.stringify(data) }, 'void');
   }
 
   // Stats API
   async getStats(): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/stats`);
-    return res.json();
+    return request(this.url('/stats'));
   }
 
   // Skills API
   async getSkills(): Promise<any[]> {
-    const res = await fetch(`${this.baseUrl}/skills`);
-    return res.json();
+    return request<any[]>(this.url('/skills'));
   }
 
   // Script API
   async getScripts(): Promise<Script[]> {
-    const res = await fetch(`${this.baseUrl}/scripts`);
-    return res.json();
+    return request<Script[]>(this.url('/scripts'));
   }
 
   async getScript(id: string): Promise<Script> {
-    const res = await fetch(`${this.baseUrl}/scripts/${id}`);
-    return res.json();
+    return request<Script>(this.url(`/scripts/${id}`));
   }
 
   async createScript(data: Partial<Script>): Promise<Script> {
-    const res = await fetch(`${this.baseUrl}/scripts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<Script>(this.url('/scripts'), { method: 'POST', body: JSON.stringify(data) });
   }
 
   async updateScript(id: string, data: Partial<Script>): Promise<Script> {
-    const res = await fetch(`${this.baseUrl}/scripts/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<Script>(this.url(`/scripts/${id}`), { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteScript(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/scripts/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/scripts/${id}`), { method: 'DELETE' }, 'void');
   }
 
   async executeScript(id: string, args?: Record<string, any>, context?: Record<string, any>): Promise<ScriptExecutionResult> {
-    const res = await fetch(`${this.baseUrl}/scripts/${id}/execute`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ args, context })
-    });
-    return res.json();
+    return request<ScriptExecutionResult>(this.url(`/scripts/${id}/execute`), { method: 'POST', body: JSON.stringify({ args, context }) });
   }
 
   async useScript(name: string, args?: Record<string, any>, context?: Record<string, any>): Promise<ScriptExecutionResult> {
-    const res = await fetch(`${this.baseUrl}/scripts/use`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, args, context })
-    });
-    return res.json();
+    return request<ScriptExecutionResult>(this.url('/scripts/use'), { method: 'POST', body: JSON.stringify({ name, args, context }) });
   }
 
   // Provider API
   async getProviders(): Promise<Provider[]> {
-    const res = await fetch(`${this.baseUrl}/providers`);
-    return res.json();
+    return request<Provider[]>(this.url('/providers'));
   }
 
   async getProviderModels(providerId: string) {
-    const res = await fetch(`${this.baseUrl}/providers/${providerId}/models`);
-    return res.json();
+    return request(this.url(`/providers/${providerId}/models`));
   }
 
   async createProvider(data: Partial<Provider>): Promise<Provider> {
-    const res = await fetch(`${this.baseUrl}/providers`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<Provider>(this.url('/providers'), { method: 'POST', body: JSON.stringify(data) });
   }
 
   async updateProvider(id: string, data: Partial<Provider>): Promise<Provider> {
-    const res = await fetch(`${this.baseUrl}/providers/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<Provider>(this.url(`/providers/${id}`), { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteProvider(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/providers/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/providers/${id}`), { method: 'DELETE' }, 'void');
   }
 
   // Test Suite API
   async getTestSuites(agentId?: string): Promise<TestSuite[]> {
-    const url = agentId ? `${this.baseUrl}/test-suites?agentId=${agentId}` : `${this.baseUrl}/test-suites`;
-    const res = await fetch(url);
-    return res.json();
+    const url = agentId ? this.url(`/test-suites?agentId=${encodeURIComponent(agentId)}`) : this.url('/test-suites');
+    return request<TestSuite[]>(url);
   }
 
   async getTestSuite(id: string): Promise<TestSuite> {
-    const res = await fetch(`${this.baseUrl}/test-suites/${id}`);
-    return res.json();
+    return request<TestSuite>(this.url(`/test-suites/${id}`));
   }
 
   async createTestSuite(data: { agentId: string; name: string; description?: string; cases?: Partial<TestCase>[] }): Promise<TestSuite> {
-    const res = await fetch(`${this.baseUrl}/test-suites`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<TestSuite>(this.url('/test-suites'), { method: 'POST', body: JSON.stringify(data) });
   }
 
   async updateTestSuite(id: string, data: Partial<TestSuite>): Promise<TestSuite> {
-    const res = await fetch(`${this.baseUrl}/test-suites/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<TestSuite>(this.url(`/test-suites/${id}`), { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteTestSuite(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/test-suites/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/test-suites/${id}`), { method: 'DELETE' }, 'void');
   }
 
   async runTestSuite(id: string): Promise<TestRun> {
-    const res = await fetch(`${this.baseUrl}/test-suites/${id}/run`, { method: 'POST' });
-    return res.json();
+    return request<TestRun>(this.url(`/test-suites/${id}/run`), { method: 'POST' });
   }
 
   async getTestRuns(id: string): Promise<TestRun[]> {
-    const res = await fetch(`${this.baseUrl}/test-suites/${id}/runs`);
-    return res.json();
+    return request<TestRun[]>(this.url(`/test-suites/${id}/runs`));
   }
 
   async createTestCase(suiteId: string, data: Partial<TestCase>): Promise<TestCase> {
-    const res = await fetch(`${this.baseUrl}/test-suites/${suiteId}/cases`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<TestCase>(this.url(`/test-suites/${suiteId}/cases`), { method: 'POST', body: JSON.stringify(data) });
   }
 
   async updateTestCase(id: string, data: Partial<TestCase>): Promise<TestCase> {
-    const res = await fetch(`${this.baseUrl}/test-cases/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request<TestCase>(this.url(`/test-cases/${id}`), { method: 'PUT', body: JSON.stringify(data) });
   }
 
   async deleteTestCase(id: string): Promise<void> {
-    await fetch(`${this.baseUrl}/test-cases/${id}`, { method: 'DELETE' });
+    await request<void>(this.url(`/test-cases/${id}`), { method: 'DELETE' }, 'void');
   }
 
   // Debug API
   async getDebugLogs(level?: string, limit = 100): Promise<DebugLogEntry[]> {
-    const url = level ? `${this.baseUrl}/debug/logs?level=${level}&limit=${limit}` : `${this.baseUrl}/debug/logs?limit=${limit}`;
-    const res = await fetch(url);
-    return res.json();
+    const url = level ? this.url(`/debug/logs?level=${level}&limit=${limit}`) : this.url(`/debug/logs?limit=${limit}`);
+    return request<DebugLogEntry[]>(url);
   }
 
   async getDebugEvents(type?: string, limit = 100): Promise<DebugEventEntry[]> {
-    const url = type ? `${this.baseUrl}/debug/events?type=${type}&limit=${limit}` : `${this.baseUrl}/debug/events?limit=${limit}`;
-    const res = await fetch(url);
-    return res.json();
+    const url = type ? this.url(`/debug/events?type=${type}&limit=${limit}`) : this.url(`/debug/events?limit=${limit}`);
+    return request<DebugEventEntry[]>(url);
   }
 
   async clearDebug(): Promise<void> {
-    await fetch(`${this.baseUrl}/debug/clear`, { method: 'POST' });
+    await request<void>(this.url('/debug/clear'), { method: 'POST' }, 'void');
   }
 
   subscribeDebugStream(
     onLog?: (entry: DebugLogEntry) => void,
     onEvent?: (event: DebugEventEntry) => void
   ): EventSource {
-    const es = new EventSource(`${this.baseUrl}/debug/stream`);
+    const es = new EventSource(this.url('/debug/stream'));
     if (onLog) es.addEventListener('log', (e: any) => onLog(JSON.parse(e.data)));
     if (onEvent) es.addEventListener('event', (e: any) => onEvent(JSON.parse(e.data)));
     return es;
@@ -322,79 +269,49 @@ export class API {
 
   // Component API
   async getComponentManifest(): Promise<ComponentContribution[]> {
-    const res = await fetch(`${this.baseUrl}/components/manifest`);
-    return res.json();
+    return request<ComponentContribution[]>(this.url('/components/manifest'));
   }
 
   // Reset / Clear API
   async resetSettings(): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/reset/settings`, { method: 'POST' });
-    return res.json();
+    return request(this.url('/reset/settings'), { method: 'POST' });
   }
 
   async clearData(targets: string[] = ['all']): Promise<{ success: boolean; cleared: string[] }> {
-    const res = await fetch(`${this.baseUrl}/clear-data`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ targets })
-    });
-    return res.json();
+    return request(this.url('/clear-data'), { method: 'POST', body: JSON.stringify({ targets }) });
   }
 
   // Export / Import API
   async exportData(scope: string = 'all'): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/export?scope=${scope}`);
-    return res.json();
+    return request(this.url(`/export?scope=${scope}`));
   }
 
   async exportConversation(id: string): Promise<any> {
-    const res = await fetch(`${this.baseUrl}/export/conversations/${id}`);
-    return res.json();
+    return request(this.url(`/export/conversations/${id}`));
   }
 
   async importData(data: any): Promise<{ success: boolean; imported: string[] }> {
-    const res = await fetch(`${this.baseUrl}/import`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    });
-    return res.json();
+    return request(this.url('/import'), { method: 'POST', body: JSON.stringify(data) });
   }
 
   // Download API
   async downloadResource(type: DownloadResourceType, id: string): Promise<Blob> {
-    const res = await fetch(`${this.baseUrl}/download/resource?type=${type}&id=${encodeURIComponent(id)}`);
-    if (!res.ok) throw new Error(`下载失败 ${res.status}`);
-    return res.blob();
+    return request<Blob>(this.url(`/download/resource?type=${type}&id=${encodeURIComponent(id)}`), {}, 'blob');
   }
 
   async downloadSource(): Promise<Blob> {
-    const res = await fetch(`${this.baseUrl}/download/source`);
-    if (!res.ok) throw new Error(`源码下载失败 ${res.status}`);
-    return res.blob();
+    return request<Blob>(this.url('/download/source'), {}, 'blob');
   }
 
   async prepareServerDownload(body: ServerDownloadRequest): Promise<{ taskId: string }> {
-    const res = await fetch(`${this.baseUrl}/download/server`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    if (!res.ok) throw new Error(`创建服务端下载任务失败 ${res.status}`);
-    return res.json();
+    return request<{ taskId: string }>(this.url('/download/server'), { method: 'POST', body: JSON.stringify(body) });
   }
 
   async getServerDownloadStatus(taskId: string): Promise<DownloadTask> {
-    const res = await fetch(`${this.baseUrl}/download/server/${encodeURIComponent(taskId)}/status`);
-    if (!res.ok) throw new Error(`获取任务状态失败 ${res.status}`);
-    return res.json();
+    return request<DownloadTask>(this.url(`/download/server/${encodeURIComponent(taskId)}/status`));
   }
 
   async controlServerDownload(taskId: string, action: 'pause' | 'resume' | 'cancel'): Promise<DownloadTask> {
-    const res = await fetch(`${this.baseUrl}/download/server/${encodeURIComponent(taskId)}/${action}`, {
-      method: 'POST'
-    });
-    if (!res.ok) throw new Error(`控制任务失败 ${res.status}`);
-    return res.json();
+    return request<DownloadTask>(this.url(`/download/server/${encodeURIComponent(taskId)}/${action}`), { method: 'POST' });
   }
 }

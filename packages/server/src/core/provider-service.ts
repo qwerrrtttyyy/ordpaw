@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Provider, ModelInfo, CreateProviderRequest } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { obfuscateApiKey, deobfuscateApiKey } from './api-key-crypto.js';
 
 const BUILT_IN_PROVIDERS: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
@@ -56,10 +58,8 @@ export class ProviderService {
   listProviders(): Provider[] {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM providers ORDER BY is_built_in DESC, name ASC');
-      if (result.length === 0) return [];
-      const columns = result[0].columns;
-      return result[0].values.map(row => this.rowToProvider(columns, row));
+      const rows = queryAll<any>(db, 'SELECT * FROM providers ORDER BY is_built_in DESC, name ASC');
+      return rows.map(row => this.rowToProvider(row));
     } catch (err) {
       console.error('listProviders 错误:', err);
       return [];
@@ -69,15 +69,10 @@ export class ProviderService {
   getProvider(idOrType: string): Provider | null {
     try {
       const db = getDatabase();
-      let result = db.exec('SELECT * FROM providers WHERE id = ?', [idOrType]);
-      if (result.length === 0 || result[0].values.length === 0) {
-        result = db.exec('SELECT * FROM providers WHERE type = ? LIMIT 1', [idOrType]);
-      }
-      if (result.length === 0 || result[0].values.length === 0) {
-        result = db.exec('SELECT * FROM providers WHERE name = ? LIMIT 1', [idOrType]);
-      }
-      if (result.length === 0 || result[0].values.length === 0) return null;
-      return this.rowToProvider(result[0].columns, result[0].values[0]);
+      let row = queryOne<any>(db, 'SELECT * FROM providers WHERE id = ?', [idOrType]);
+      if (!row) row = queryOne<any>(db, 'SELECT * FROM providers WHERE type = ? LIMIT 1', [idOrType]);
+      if (!row) row = queryOne<any>(db, 'SELECT * FROM providers WHERE name = ? LIMIT 1', [idOrType]);
+      return row ? this.rowToProvider(row) : null;
     } catch (err) {
       console.error('getProvider 错误:', err);
       return null;
@@ -87,9 +82,8 @@ export class ProviderService {
   getProviderByName(name: string): Provider | null {
     try {
       const db = getDatabase();
-      const result = db.exec('SELECT * FROM providers WHERE name = ?', [name]);
-      if (result.length === 0 || result[0].values.length === 0) return null;
-      return this.rowToProvider(result[0].columns, result[0].values[0]);
+      const row = queryOne<any>(db, 'SELECT * FROM providers WHERE name = ?', [name]);
+      return row ? this.rowToProvider(row) : null;
     } catch (err) {
       console.error('getProviderByName 错误:', err);
       return null;
@@ -103,7 +97,8 @@ export class ProviderService {
     const safeName = (data.name || '自定义服务商').toString();
     const safeType = (data.type || 'custom').toString();
     const safeBaseUrl = (data.baseUrl || '').toString();
-    const safeApiKey = (data.apiKey || '').toString();
+    // Obfuscate before storing so the DB never holds plaintext keys.
+    const safeApiKey = obfuscateApiKey((data.apiKey || '').toString());
     const safeApiKeyName = (data.apiKeyName || '').toString();
     const models = Array.isArray(data.models) ? data.models : [];
     const config = data.config || {};
@@ -135,7 +130,8 @@ export class ProviderService {
     }
     if (data.apiKey !== undefined) {
       updates.push('api_key = ?');
-      params.push(data.apiKey.toString());
+      // Obfuscate before storing.
+      params.push(obfuscateApiKey((data.apiKey || '').toString()));
     }
     if (data.apiKeyName !== undefined) {
       updates.push('api_key_name = ?');
@@ -202,18 +198,15 @@ export class ProviderService {
     saveDatabase();
   }
 
-  private rowToProvider(columns: string[], row: any[]): Provider {
-    const p: any = {};
-    columns.forEach((col, idx) => {
-      p[col] = row[idx];
-    });
+  private rowToProvider(p: any): Provider {
     return {
       id: p.id,
       name: p.name,
       type: p.type,
       baseUrl: p.base_url || undefined,
       apiKeyName: p.api_key_name || undefined,
-      apiKey: p.api_key || undefined,
+      // Deobfuscate on read so callers (agentRuntime) get the real key.
+      apiKey: deobfuscateApiKey(p.api_key) || undefined,
       models: safeJsonParse(p.models_json, []),
       enabled: p.enabled === 1,
       isBuiltIn: p.is_built_in === 1,
@@ -221,16 +214,6 @@ export class ProviderService {
       createdAt: p.created_at,
       updatedAt: p.updated_at
     };
-  }
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
   }
 }
 

@@ -54,7 +54,27 @@ export class BottomNav {
     });
   }
 
-  setCounts(_stats: Record<string, number>) {
-    // counts are shown in drawer/sidebar, not bottom nav
+  setCounts(stats: Record<string, number>) {
+    // Show a small badge count next to the agents nav item, since agents is
+    // a top-level concept users check frequently on mobile.
+    this.container.querySelectorAll('.bottom-nav-item').forEach(item => {
+      const route = item.getAttribute('data-route');
+      const badge = item.querySelector('.bottom-nav-badge') as HTMLElement | null;
+      let count: number | undefined;
+      if (route === '#/agents') count = stats.agents;
+      else if (route === '#/') count = stats.conversations;
+      else if (route === '#/tests') count = stats.testSuites;
+
+      if (count !== undefined && count > 0) {
+        if (!badge) {
+          const b = document.createElement('span');
+          b.className = 'bottom-nav-badge';
+          item.appendChild(b);
+        }
+        (item.querySelector('.bottom-nav-badge') as HTMLElement).textContent = String(count);
+      } else if (badge) {
+        badge.remove();
+      }
+    });
   }
 }

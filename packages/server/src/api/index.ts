@@ -13,6 +13,7 @@ import { componentServer } from '../core/component-server.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { setupDownloadRoutes } from '../core/download-service.js';
 import { asyncHandler, ApiError, validateBody } from '../middleware.js';
+import { queryAll, queryOne, rowToObject, safeJsonParse, safeCount as dbSafeCount } from '../db/utils.js';
 
 const DEFAULT_SETTINGS: any = {
   theme: 'ordpaw-light',
@@ -26,14 +27,6 @@ const DEFAULT_SETTINGS: any = {
   apiKeys: {},
   apiEndpoints: {}
 };
-
-function rowToObject(columns: string[], row: any[]): any {
-  const obj: any = {};
-  columns.forEach((col, idx) => {
-    obj[col] = row[idx];
-  });
-  return obj;
-}
 
 export function setupApiRoutes(app: any) {
   const router = Router();
@@ -69,8 +62,15 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ Provider API ============
+  // Strip API key from responses sent to the client. The frontend only needs
+  // to know whether a key is set (boolean), never the key itself.
+  function stripApiKey(provider: any) {
+    if (!provider) return provider;
+    return { ...provider, apiKey: provider.apiKey ? '••••••' : '', hasApiKey: Boolean(provider.apiKey) };
+  }
+
   router.get('/providers', asyncHandler(async (_req: Request, res: Response) => {
-    res.json(providerService.listProviders());
+    res.json(providerService.listProviders().map(stripApiKey));
   }));
 
   router.get('/providers/:id/models', asyncHandler(async (req: Request, res: Response) => {
@@ -80,13 +80,13 @@ export function setupApiRoutes(app: any) {
 
   router.post('/providers', validateBody<{ name: string; type: string }>({ name: 'string', type: 'string' }), asyncHandler(async (req: Request, res: Response) => {
     const provider = providerService.createProvider(req.body);
-    res.status(201).json(provider);
+    res.status(201).json(stripApiKey(provider));
   }));
 
   router.put('/providers/:id', asyncHandler(async (req: Request, res: Response) => {
     const provider = providerService.updateProvider(req.params.id, req.body);
     if (!provider) throw ApiError.notFound('Provider 不存在');
-    res.json(provider);
+    res.json(stripApiKey(provider));
   }));
 
   router.delete('/providers/:id', asyncHandler(async (req: Request, res: Response) => {
@@ -522,14 +522,14 @@ export function setupApiRoutes(app: any) {
     const db = getDatabase();
 
     const stats = {
-      agents: safeCount(db, 'SELECT COUNT(*) as count FROM agents'),
-      conversations: safeCount(db, 'SELECT COUNT(*) as count FROM conversations'),
-      plugins: safeCount(db, 'SELECT COUNT(*) as count FROM plugins'),
-      prompts: safeCount(db, 'SELECT COUNT(*) as count FROM prompts'),
-      scripts: safeCount(db, 'SELECT COUNT(*) as count FROM scripts'),
+      agents: dbSafeCount(db, 'SELECT COUNT(*) as count FROM agents'),
+      conversations: dbSafeCount(db, 'SELECT COUNT(*) as count FROM conversations'),
+      plugins: dbSafeCount(db, 'SELECT COUNT(*) as count FROM plugins'),
+      prompts: dbSafeCount(db, 'SELECT COUNT(*) as count FROM prompts'),
+      scripts: dbSafeCount(db, 'SELECT COUNT(*) as count FROM scripts'),
       skills: skillRunner.listSkills().length,
-      providers: safeCount(db, 'SELECT COUNT(*) as count FROM providers'),
-      testSuites: safeCount(db, 'SELECT COUNT(*) as count FROM test_suites')
+      providers: dbSafeCount(db, 'SELECT COUNT(*) as count FROM providers'),
+      testSuites: dbSafeCount(db, 'SELECT COUNT(*) as count FROM test_suites')
     };
 
     statsCache.set('stats', stats);
@@ -692,25 +692,4 @@ export function setupApiRoutes(app: any) {
     statsCache.clear();
     res.json({ success: true, imported });
   }));
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
-  }
-}
-
-function safeCount(db: any, sql: string): number {
-  try {
-    const result = db.exec(sql);
-    if (result.length === 0) return 0;
-    return Number(result[0].values[0][0]) || 0;
-  } catch (err) {
-    console.error('safeCount 错误:', err);
-    return 0;
-  }
 }

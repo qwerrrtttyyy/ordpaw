@@ -2,16 +2,72 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { agentRuntime } from '../core/agent-runtime.js';
 import { eventBus } from '../core/event-bus.js';
 
-const clientDebugHandlers = new WeakMap<WebSocket, Set<(payload: any) => void>>();
+/**
+ * Split a string into stream chunks that respect both ASCII word boundaries
+ * and CJK character boundaries. CJK characters are streamed one at a time
+ * (since they have no spaces), while ASCII words are streamed word-by-word.
+ */
+function chunkResponse(text: string): string[] {
+  const chunks: string[] = [];
+  let buffer = '';
+  for (const ch of text) {
+    const code = ch.codePointAt(0) ?? 0;
+    const isCJK =
+      (code >= 0x3000 && code <= 0x30ff) ||  // CJK + Japanese punctuation
+      (code >= 0x3400 && code <= 0x9fff) ||  // CJK Unified Ideographs
+      (code >= 0xff00 && code <= 0xffef) ||  // Fullwidth
+      (code >= 0x4e00 && code <= 0x9fff);    // CJK Unified
+    if (isCJK) {
+      if (buffer) { chunks.push(buffer); buffer = ''; }
+      chunks.push(ch);
+    } else if (ch === ' ' || ch === '\n' || ch === '\t') {
+      if (buffer) { chunks.push(buffer); buffer = ''; }
+      chunks.push(ch);
+    } else {
+      buffer += ch;
+    }
+  }
+  if (buffer) chunks.push(buffer);
+  return chunks.length > 0 ? chunks : [text];
+}
+
+/** Per-connection subscription bookkeeping. */
+interface ClientSubscriptions {
+  debugHandler: (payload: any) => void;
+  eventHandler: (payload: any) => void;
+  checkpointHandler: (payload: any) => void;
+}
 
 export function setupWebSocket(wss: WebSocketServer) {
+  // Track subscriptions per-connection so we can properly off() them on close,
+  // fixing the previous memory leak where closures were registered on eventBus
+  // forever (relying only on `ws.readyState !== OPEN` to no-op).
+  const subscriptions = new WeakMap<WebSocket, ClientSubscriptions>();
+
   wss.on('connection', (ws: WebSocket) => {
     console.log('🔌 WebSocket 客户端已连接');
 
-    const debugHandlers = new Set<(payload: any) => void>();
-    const eventHandlers = new Set<(payload: any) => void>();
-    const checkpointHandlers = new Set<(payload: any) => void>();
-    clientDebugHandlers.set(ws, debugHandlers);
+    const debugHandler = (payload: any) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'debug:log', payload }));
+      }
+    };
+    const eventHandler = (payload: any) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'debug:event', payload }));
+      }
+    };
+    const checkpointHandler = (payload: any) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'checkpoint:created', payload }));
+      }
+    };
+
+    eventBus.on('debug:log', debugHandler);
+    eventBus.on('debug:event', eventHandler);
+    eventBus.on('checkpoint:created', checkpointHandler);
+
+    subscriptions.set(ws, { debugHandler, eventHandler, checkpointHandler });
 
     ws.on('message', async (data: Buffer) => {
       try {
@@ -25,7 +81,6 @@ export function setupWebSocket(wss: WebSocketServer) {
             return;
           }
 
-          // 发送开始事件
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'chat:start',
@@ -33,7 +88,6 @@ export function setupWebSocket(wss: WebSocketServer) {
             }));
           }
 
-          // 处理消息
           const response = await agentRuntime.processMessage(conversationId, content);
 
           if (!response) {
@@ -41,18 +95,18 @@ export function setupWebSocket(wss: WebSocketServer) {
             return;
           }
 
-          // 流式响应（模拟）
+          // CJK-aware chunked streaming.
           try {
-            const words = response.content.split(' ');
-            for (let i = 0; i < words.length; i++) {
+            const chunks = chunkResponse(response.content);
+            for (let i = 0; i < chunks.length; i++) {
               if (ws.readyState !== WebSocket.OPEN) break;
-              await new Promise(resolve => setTimeout(resolve, 50));
+              await new Promise(resolve => setTimeout(resolve, 30));
               ws.send(JSON.stringify({
                 type: 'chat:stream',
                 payload: {
                   conversationId,
-                  chunk: words[i] + ' ',
-                  done: i === words.length - 1
+                  chunk: chunks[i],
+                  done: i === chunks.length - 1
                 }
               }));
             }
@@ -60,7 +114,6 @@ export function setupWebSocket(wss: WebSocketServer) {
             console.error('流式发送错误:', streamErr);
           }
 
-          // 发送完成事件
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({
               type: 'chat:done',
@@ -80,40 +133,19 @@ export function setupWebSocket(wss: WebSocketServer) {
 
     ws.on('close', () => {
       console.log('🔌 WebSocket 客户端已断开');
-      // 清理 handler 引用
-      debugHandlers.clear();
-      eventHandlers.clear();
-      checkpointHandlers.clear();
+      // Properly unsubscribe from eventBus — fixes the prior leak.
+      const subs = subscriptions.get(ws);
+      if (subs) {
+        eventBus.off('debug:log', subs.debugHandler);
+        eventBus.off('debug:event', subs.eventHandler);
+        eventBus.off('checkpoint:created', subs.checkpointHandler);
+        subscriptions.delete(ws);
+      }
     });
 
     ws.on('error', (err) => {
       console.error('WebSocket 错误:', err);
     });
-
-    // 监听事件总线并推送给客户端
-    const debugHandler = (payload: any) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'debug:log', payload }));
-      }
-    };
-    debugHandlers.add(debugHandler);
-    eventBus.on('debug:log', debugHandler);
-
-    const eventHandler = (payload: any) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'debug:event', payload }));
-      }
-    };
-    eventHandlers.add(eventHandler);
-    eventBus.on('debug:event', eventHandler);
-
-    const checkpointHandler = (payload: any) => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'checkpoint:created', payload }));
-      }
-    };
-    checkpointHandlers.add(checkpointHandler);
-    eventBus.on('checkpoint:created', checkpointHandler);
   });
 
   wss.on('error', (err) => {

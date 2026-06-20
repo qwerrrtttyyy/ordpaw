@@ -21,6 +21,7 @@ import { loadPluginComponents } from './component-loader';
 import { detectPerformanceTier, initAnimationPreferences } from './animation-manager';
 import { SequenceExecutor } from './sequence-executor';
 import { DownloadManager } from './download-manager';
+import { installGlobalPluginApi } from './plugin-registry';
 
 export class App {
   private router: Router;
@@ -73,6 +74,10 @@ export class App {
     const effectiveTier = this.resolvePerformanceTier();
     initAnimationPreferences(effectiveTier);
     document.documentElement.setAttribute('data-perf-tier', effectiveTier);
+
+    // Install the public window.OrdPaw plugin API before loading plugin
+    // components so contributed scripts can immediately register themselves.
+    installGlobalPluginApi(() => this.store.getSettings());
     loadPluginComponents();
 
     app.appendChild(this.sidebar.render());
@@ -104,11 +109,31 @@ export class App {
     });
   }
 
+  /**
+   * Reload the plugin component manifest from the server and inject any new
+   * CSS/script contributions. Called after a plugin is installed/uninstalled
+   * at runtime — fixes the prior issue where users had to refresh the page
+   * to see newly-installed plugin contributions.
+   */
+  async reloadPluginComponents() {
+    try {
+      await loadPluginComponents();
+    } catch (err) {
+      console.error('重载插件组件失败:', err);
+    }
+  }
+
   private initWebSocket() {
     try {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Honor Vite dev proxy: if the page is served from the dev server,
+      // use the same host:port (the proxy forwards /ws to the backend).
+      // In production, fall back to explicit port 3000 only when the page
+      // itself isn't already on 3000.
       const wsHost = window.location.hostname;
-      const wsPort = '3000'; // 后端端口
+      const wsPort = window.location.port && window.location.port !== '5173'
+        ? window.location.port
+        : '3000';
       const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}`;
 
       this.ws = new WebSocket(wsUrl);

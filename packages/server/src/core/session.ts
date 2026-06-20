@@ -3,6 +3,7 @@ import type { Conversation, Message } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { checkpointManager } from './checkpoint.js';
 import { eventBus } from './event-bus.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 
 export class SessionManager {
   createConversation(agentId: string, title?: string): Conversation {
@@ -24,39 +25,21 @@ export class SessionManager {
   getConversation(id: string): Conversation | null {
     try {
       const db = getDatabase();
-      const convResult = db.exec('SELECT * FROM conversations WHERE id = ?', [id]);
+      const conv = queryOne<any>(db, 'SELECT * FROM conversations WHERE id = ?', [id]);
+      if (!conv) return null;
 
-      if (convResult.length === 0 || convResult[0].values.length === 0) return null;
-
-      const convRow = convResult[0].values[0];
-      const convColumns = convResult[0].columns;
-      const conv: any = {};
-      convColumns.forEach((col, idx) => {
-        conv[col] = convRow[idx];
-      });
-
-      const msgResult = db.exec(
-        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC',
+      const msgRows = queryAll<any>(
+        db,
+        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC, id ASC',
         [id]
       );
-      const messages: Message[] = [];
-
-      if (msgResult.length > 0) {
-        const msgColumns = msgResult[0].columns;
-        msgResult[0].values.forEach(row => {
-          const msg: any = {};
-          msgColumns.forEach((col, idx) => {
-            msg[col] = row[idx];
-          });
-          messages.push({
-            id: msg.id,
-            role: msg.role,
-            content: msg.content,
-            timestamp: msg.timestamp,
-            metadata: safeJsonParse(msg.metadata_json, {})
-          });
-        });
-      }
+      const messages: Message[] = msgRows.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        metadata: safeJsonParse(msg.metadata_json, {})
+      }));
 
       const checkpoints = checkpointManager.getCheckpoints(id);
 
@@ -79,31 +62,19 @@ export class SessionManager {
   listConversations(agentId?: string): Conversation[] {
     try {
       const db = getDatabase();
-      let result;
-      if (agentId) {
-        result = db.exec('SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC', [agentId]);
-      } else {
-        result = db.exec('SELECT * FROM conversations ORDER BY updated_at DESC');
-      }
-      if (result.length === 0) return [];
-
-      const columns = result[0].columns;
-      return result[0].values.map(row => {
-        const conv: any = {};
-        columns.forEach((col, idx) => {
-          conv[col] = row[idx];
-        });
-        return {
-          id: conv.id,
-          agentId: conv.agent_id,
-          title: conv.title,
-          messages: [],
-          checkpoints: [],
-          variables: safeJsonParse(conv.variables_json, {}),
-          createdAt: conv.created_at,
-          updatedAt: conv.updated_at
-        };
-      });
+      const rows = agentId
+        ? queryAll<any>(db, 'SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
+        : queryAll<any>(db, 'SELECT * FROM conversations ORDER BY updated_at DESC');
+      return rows.map(conv => ({
+        id: conv.id,
+        agentId: conv.agent_id,
+        title: conv.title,
+        messages: [],
+        checkpoints: [],
+        variables: safeJsonParse(conv.variables_json, {}),
+        createdAt: conv.created_at,
+        updatedAt: conv.updated_at
+      }));
     } catch (err) {
       console.error('listConversations 错误:', err);
       return [];
@@ -164,16 +135,6 @@ export class SessionManager {
       console.error('updateVariables 错误:', err);
       return false;
     }
-  }
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
   }
 }
 

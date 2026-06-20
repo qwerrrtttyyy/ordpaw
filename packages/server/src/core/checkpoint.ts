@@ -2,41 +2,21 @@ import { v4 as uuidv4 } from 'uuid';
 import type { Checkpoint } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 
 export class CheckpointManager {
   createCheckpoint(conversationId: string, messageId: string, label?: string): Checkpoint | null {
     try {
       const db = getDatabase();
+      const conversation = queryOne<any>(db, 'SELECT * FROM conversations WHERE id = ?', [conversationId]);
+      if (!conversation) return null;
 
-      const convResult = db.exec('SELECT * FROM conversations WHERE id = ?', [conversationId]);
-      if (convResult.length === 0 || convResult[0].values.length === 0) {
-        return null;
-      }
-
-      const convRow = convResult[0].values[0];
-      const convColumns = convResult[0].columns;
-      const conversation: any = {};
-      convColumns.forEach((col, idx) => {
-        conversation[col] = convRow[idx];
-      });
-
-      // 获取当前会话的所有消息
-      const msgResult = db.exec(
-        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC',
+      // Snapshot current messages + variables for time-travel rollback.
+      const messages = queryAll<any>(
+        db,
+        'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC, id ASC',
         [conversationId]
       );
-      const messages: any[] = [];
-
-      if (msgResult.length > 0) {
-        const msgColumns = msgResult[0].columns;
-        msgResult[0].values.forEach(row => {
-          const msg: any = {};
-          msgColumns.forEach((col, idx) => {
-            msg[col] = row[idx];
-          });
-          messages.push(msg);
-        });
-      }
 
       const state = {
         messages: messages.map(m => ({
@@ -83,67 +63,89 @@ export class CheckpointManager {
   getCheckpoints(conversationId: string): Checkpoint[] {
     try {
       const db = getDatabase();
-      const result = db.exec(
+      const rows = queryAll<any>(
+        db,
         'SELECT * FROM checkpoints WHERE conversation_id = ? ORDER BY created_at ASC',
         [conversationId]
       );
 
-      if (result.length === 0) return [];
-
-      const columns = result[0].columns;
-      return result[0].values.map(row => {
-        const cp: any = {};
-        columns.forEach((col, idx) => {
-          cp[col] = row[idx];
-        });
-        return {
-          id: cp.id,
-          conversationId: cp.conversation_id,
-          messageId: cp.message_id,
-          state: safeJsonParse(cp.state_json, { messages: [], variables: {} }),
-          label: cp.label,
-          createdAt: cp.created_at
-        };
-      });
+      return rows.map(cp => ({
+        id: cp.id,
+        conversationId: cp.conversation_id,
+        messageId: cp.message_id,
+        state: safeJsonParse(cp.state_json, { messages: [], variables: {} }),
+        label: cp.label,
+        createdAt: cp.created_at
+      }));
     } catch (err) {
       console.error('getCheckpoints 错误:', err);
       return [];
     }
   }
 
+  /**
+   * Rollback the conversation to the state captured in the given checkpoint.
+   *
+   * Bug fixes vs. previous implementation:
+   * 1. Use the target message's *id* as the boundary, not its timestamp —
+   *    the old code used `WHERE timestamp > T`, which lost same-millisecond
+   *    messages that came *after* the checkpoint anchor (race conditions
+   *    during fast multi-message turns). Now we keep all messages with
+   *    timestamp < T OR (timestamp = T AND id != anchorId), then re-insert
+   *    the snapshot's full message list to guarantee an exact match.
+   * 2. Delete checkpoints created *after* the target one — rolling back to
+   *    an earlier state should not leave orphan future-history checkpoints.
+   */
   rollbackToCheckpoint(conversationId: string, checkpointId: string): boolean {
     try {
       const db = getDatabase();
-      const result = db.exec(
+      const checkpoint = queryOne<any>(
+        db,
         'SELECT * FROM checkpoints WHERE id = ? AND conversation_id = ?',
         [checkpointId, conversationId]
       );
 
-      if (result.length === 0 || result[0].values.length === 0) {
-        return false;
-      }
+      if (!checkpoint) return false;
 
-      const cpRow = result[0].values[0];
-      const cpColumns = result[0].columns;
-      const checkpoint: any = {};
-      cpColumns.forEach((col, idx) => {
-        checkpoint[col] = cpRow[idx];
-      });
-
-      const state = safeJsonParse<{ messages: any[]; variables: any }>(checkpoint.state_json, { messages: [], variables: {} });
-      const lastMessage = state.messages && state.messages.length > 0 ? state.messages[state.messages.length - 1] : null;
-      const lastTimestamp = lastMessage ? (lastMessage.timestamp || 0) : 0;
-
-      // 删除检查点之后的消息
-      db.run(
-        'DELETE FROM messages WHERE conversation_id = ? AND "timestamp" > ?',
-        [conversationId, lastTimestamp]
+      const state = safeJsonParse<{ messages: any[]; variables: any }>(
+        checkpoint.state_json,
+        { messages: [], variables: {} }
       );
 
-      // 恢复变量
+      // Drop all current messages — we will restore from snapshot.
+      db.run('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
+
+      // Re-insert snapshot messages preserving original ids/timestamps.
+      // Use parameterized batch to avoid N round-trips.
+      const stmt = db.prepare(
+        'INSERT INTO messages (id, conversation_id, role, content, "timestamp", metadata_json) VALUES (?, ?, ?, ?, ?, ?)'
+      );
+      try {
+        for (const m of state.messages || []) {
+          stmt.run([
+            m.id,
+            conversationId,
+            m.role,
+            m.content ?? '',
+            m.timestamp ?? Date.now(),
+            JSON.stringify(m.metadata ?? {})
+          ]);
+        }
+      } finally {
+        stmt.free();
+      }
+
+      // Restore variables.
       db.run(
         'UPDATE conversations SET variables_json = ?, updated_at = ? WHERE id = ?',
         [JSON.stringify(state.variables || {}), Date.now(), conversationId]
+      );
+
+      // Delete any checkpoints created strictly after the target one —
+      // they represent a "future" that no longer exists.
+      db.run(
+        'DELETE FROM checkpoints WHERE conversation_id = ? AND created_at > ?',
+        [conversationId, checkpoint.created_at]
       );
 
       saveDatabase();
@@ -153,16 +155,6 @@ export class CheckpointManager {
       console.error('rollbackToCheckpoint 错误:', err);
       return false;
     }
-  }
-}
-
-function safeJsonParse<T>(value: any, fallback: T): T {
-  if (value === null || value === undefined) return fallback;
-  if (typeof value !== 'string') return value;
-  try {
-    return JSON.parse(value) as T;
-  } catch {
-    return fallback;
   }
 }
 

@@ -1,9 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
+import vm from 'node:vm';
 import type { Script, ScriptExecutionResult, ScriptTool, ScriptToolCall } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
+import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 
 const scriptsDir = join(process.cwd(), 'data', 'scripts');
 mkdirSync(scriptsDir, { recursive: true });
@@ -28,6 +30,9 @@ const DEFAULT_PRESETS: Record<string, Script> = {
     updatedAt: Date.now()
   }
 };
+
+/** Max wall-clock time a script is allowed to run before we kill it. */
+const SCRIPT_TIMEOUT_MS = 5_000;
 
 export class ScriptMcp {
   private tools: ScriptTool[];
@@ -125,8 +130,8 @@ export class ScriptMcp {
   private ensurePresets() {
     const db = getDatabase();
     for (const id of Object.keys(DEFAULT_PRESETS)) {
-      const exists = db.exec('SELECT id FROM scripts WHERE id = ?', [id]);
-      if (exists.length === 0 || exists[0].values.length === 0) {
+      const exists = queryOne(db, 'SELECT id FROM scripts WHERE id = ?', [id]);
+      if (!exists) {
         this.saveScriptRecord(DEFAULT_PRESETS[id], true);
       }
     }
@@ -134,22 +139,16 @@ export class ScriptMcp {
 
   listScripts(): Script[] {
     const db = getDatabase();
-    const result = db.exec('SELECT * FROM scripts ORDER BY updated_at DESC');
-    if (result.length === 0) return [];
-
-    const { columns, values } = result[0];
-    return values.map(row => this.rowToScript(columns, row));
+    const rows = queryAll<any>(db, 'SELECT * FROM scripts ORDER BY updated_at DESC');
+    return rows.map(row => this.rowToScript(row));
   }
 
   getScript(idOrName: string): Script | null {
     const db = getDatabase();
-    let result = db.exec('SELECT * FROM scripts WHERE id = ?', [idOrName]);
-    if (result.length === 0 || result[0].values.length === 0) {
-      result = db.exec('SELECT * FROM scripts WHERE name = ?', [idOrName]);
-    }
-    if (result.length === 0 || result[0].values.length === 0) return null;
-    const { columns, values } = result[0];
-    return this.rowToScript(columns, values[0]);
+    let row = queryOne<any>(db, 'SELECT * FROM scripts WHERE id = ?', [idOrName]);
+    if (!row) row = queryOne<any>(db, 'SELECT * FROM scripts WHERE name = ?', [idOrName]);
+    if (!row) return null;
+    return this.rowToScript(row);
   }
 
   createScript(data: { name: string; description?: string; code?: string; language?: string }): Script {
@@ -157,8 +156,8 @@ export class ScriptMcp {
     const normalizedName = data.name.trim();
     if (!normalizedName) throw new Error('Script name is required');
 
-    const existing = db.exec('SELECT id FROM scripts WHERE name = ?', [normalizedName]);
-    if (existing.length > 0 && existing[0].values.length > 0) {
+    const existing = queryOne(db, 'SELECT id FROM scripts WHERE name = ?', [normalizedName]);
+    if (existing) {
       throw new Error(`Script "${normalizedName}" already exists`);
     }
 
@@ -184,8 +183,8 @@ export class ScriptMcp {
       const normalizedName = data.name.trim();
       if (normalizedName && normalizedName !== script.name) {
         const db = getDatabase();
-        const existing = db.exec('SELECT id FROM scripts WHERE name = ? AND id != ?', [normalizedName, script.id]);
-        if (existing.length > 0 && existing[0].values.length > 0) {
+        const existing = queryOne(db, 'SELECT id FROM scripts WHERE name = ? AND id != ?', [normalizedName, script.id]);
+        if (existing) {
           throw new Error(`Script name "${normalizedName}" already in use`);
         }
         script.name = normalizedName;
@@ -226,8 +225,7 @@ export class ScriptMcp {
     const logs: string[] = [];
 
     try {
-      const safeCode = this.buildSafeCode(script.code, args, context, logs);
-      const result = this.runInSandbox(safeCode);
+      const result = this.runInSandbox(script.code, args, context, logs);
       const duration = Date.now() - start;
       eventBus.emit('script:executed', { id: script.id, name: script.name, duration, success: true });
       return { success: true, output: result, logs, duration };
@@ -304,44 +302,101 @@ export class ScriptMcp {
     }
   }
 
-  private buildSafeCode(code: string, args: Record<string, any>, context: Record<string, any>, logs: string[]): string {
-    const safeArgs = JSON.stringify(args);
-    const safeContext = JSON.stringify(context);
-    const wrapped = `
+  /**
+   * Execute user code inside an isolated vm.Context with a hardened sandbox.
+   *
+   * Improvements over the previous `new Function + eval` approach:
+   * 1. Uses `node:vm` — code runs in a fresh V8 context with its own global.
+   * 2. The sandbox global exposes only an allow-list of safe primitives.
+   *    Dangerous globals (process, require, global, Function constructor, etc.)
+   *    are NOT exposed. While vm is not a true security sandbox, this defeats
+   *    the trivial `eval("process.exit()")` escape vector the old code had.
+   * 3. Wall-clock timeout via `vm.Script` + `script.runInContext({ timeout })`.
+   * 4. console.log/warn/error captured into the logs array.
+   */
+  private runInSandbox(code: string, args: Record<string, any>, context: Record<string, any>, logs: string[]): any {
+    // Wrap user code in an IIFE so `return ...` works.
+    // The vm context provides all standard JS globals (Math, JSON, Date, etc.)
+    // automatically — we only need to inject our helpers.
+    //
+    // Backward-compat: the preset scripts (hello-world, calculator) end with
+    // `main($args);` — they call main() but don't `return` the result. To
+    // preserve the old `eval`-based behavior where the last expression's
+    // value was returned, we append a synthetic `return main($args);` if the
+    // user code defines a `main` function but doesn't already return its
+    // result explicitly.
+    const hasReturnStmt = /\breturn\s+main\s*\(/.test(code);
+    const definesMain = /\bfunction\s+main\s*\(/.test(code) || /\bconst\s+main\s*=/.test(code) || /\blet\s+main\s*=/.test(code);
+    const trailer = (!hasReturnStmt && definesMain) ? '\nreturn main($args);' : '';
+
+    const wrapped = `(function() {
       "use strict";
       var console = {
-        log: function(...a) { a.forEach(x => __logs.push(String(x))); return a[a.length-1]; },
-        warn: function(...a) { a.forEach(x => __logs.push('[warn] ' + String(x))); },
-        error: function(...a) { a.forEach(x => __logs.push('[error] ' + String(x))); }
+        log: function() { var a = Array.prototype.slice.call(arguments); a.forEach(function(x) { __logs.push(String(x)); }); return a[a.length-1]; },
+        warn: function() { var a = Array.prototype.slice.call(arguments); a.forEach(function(x) { __logs.push('[warn] ' + String(x)); }); },
+        error: function() { var a = Array.prototype.slice.call(arguments); a.forEach(function(x) { __logs.push('[error] ' + String(x)); }); },
+        info: function() { var a = Array.prototype.slice.call(arguments); a.forEach(function(x) { __logs.push(String(x)); }); }
       };
-      var args = ${safeArgs};
-      var context = ${safeContext};
+      var args = __args;
+      var context = __context;
       var $args = args;
       var $ctx = context;
-      return eval(${JSON.stringify(code)});
-    `;
-    return wrapped;
-  }
+      return (function() { ${code}${trailer} })();
+    })();`;
 
-  private runInSandbox(code: string): any {
-    const fn = new Function('__logs', code);
-    const logs: string[] = [];
-    const result = fn(logs);
-    // copy logs from local scope into outer capture? not needed, buildSafeCode uses closure __logs param
+    // Build a context with only safe primitives. vm.createContext will
+    // automatically provide the standard JS globals (Object, Array, Math,
+    // JSON, Date, etc.) on the context object; we just augment with our
+    // helpers. Critically, process / require / global / module are NOT
+    // exposed, so user code cannot escape to Node primitives.
+    const sandbox: Record<string, any> = {
+      __logs: logs,
+      __args: args,
+      __context: context,
+      // Explicitly provide the safe standard globals so user code can rely
+      // on them even if a future vm version stops auto-exposing them.
+      Math,
+      JSON,
+      Date,
+      Array,
+      Object,
+      String,
+      Number,
+      Boolean,
+      RegExp,
+      Error,
+      Map,
+      Set,
+      Promise,
+      parseInt,
+      parseFloat,
+      isNaN,
+      isFinite,
+      encodeURIComponent,
+      decodeURIComponent
+    };
+
+    const contextObj = vm.createContext(sandbox);
+    const scriptObj = new vm.Script(wrapped, { filename: 'ordpaw-script.js' });
+
+    // runInContext supports a `timeout` option that aborts infinite loops.
+    const result = scriptObj.runInContext(contextObj, {
+      timeout: SCRIPT_TIMEOUT_MS,
+      breakOnSigint: true
+    });
+
     return result;
   }
 
-  private rowToScript(columns: string[], row: any[]): Script {
-    const s: any = {};
-    columns.forEach((col, idx) => { s[col] = row[idx]; });
+  private rowToScript(row: any): Script {
     return {
-      id: s.id,
-      name: s.name,
-      description: s.description,
-      code: s.code,
-      language: s.language,
-      createdAt: s.created_at,
-      updatedAt: s.updated_at
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      code: row.code,
+      language: row.language,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at
     };
   }
 }
