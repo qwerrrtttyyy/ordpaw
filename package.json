@@ -1,0 +1,19 @@
+{
+  "name": "ordpaw",
+  "version": "1.0.0",
+  "description": "OrdPaw — A powerful AI/Agent client",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "pnpm -r dev",
+    "build": "pnpm -r build",
+    "dev:server": "pnpm --filter @ordpaw/server dev",
+    "dev:client": "pnpm --filter @ordpaw/client dev"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

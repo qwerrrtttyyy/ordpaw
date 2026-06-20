@@ -1,0 +1,355 @@
+import { v4 as uuidv4 } from 'uuid';
+import type { TestSuite, TestCase, TestRun, TestRunResult, CreateTestSuiteRequest } from '@ordpaw/shared';
+import { getDatabase, saveDatabase } from '../db/index.js';
+import { agentRuntime } from './agent-runtime.js';
+import { sessionManager } from './session.js';
+
+export class TestSuiteManager {
+  listSuites(agentId?: string): TestSuite[] {
+    try {
+      const db = getDatabase();
+      let result;
+      if (agentId) {
+        result = db.exec('SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC', [agentId]);
+      } else {
+        result = db.exec('SELECT * FROM test_suites ORDER BY updated_at DESC');
+      }
+      if (result.length === 0) return [];
+      const columns = result[0].columns;
+      return result[0].values.map(row => this.rowToSuite(columns, row));
+    } catch (err) {
+      console.error('listSuites 错误:', err);
+      return [];
+    }
+  }
+
+  getSuite(id: string): TestSuite | null {
+    try {
+      const db = getDatabase();
+      const result = db.exec('SELECT * FROM test_suites WHERE id = ?', [id]);
+      if (result.length === 0 || result[0].values.length === 0) return null;
+      return this.rowToSuite(result[0].columns, result[0].values[0]);
+    } catch (err) {
+      console.error('getSuite 错误:', err);
+      return null;
+    }
+  }
+
+  createSuite(data: CreateTestSuiteRequest): TestSuite {
+    const db = getDatabase();
+    const now = Date.now();
+    const id = uuidv4();
+    const agentId = data.agentId.toString();
+    const name = (data.name || '未命名测试套件').toString();
+    const description = (data.description || '').toString();
+
+    db.run(`
+      INSERT INTO test_suites (id, agent_id, name, description, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `, [id, agentId, name, description, now, now]);
+
+    const cases = data.cases || [];
+    for (const c of cases) {
+      this.createCaseInternal(id, c);
+    }
+
+    saveDatabase();
+    return this.getSuite(id)!;
+  }
+
+  updateSuite(id: string, data: Partial<TestSuite>): TestSuite | null {
+    const suite = this.getSuite(id);
+    if (!suite) return null;
+
+    const db = getDatabase();
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.name !== undefined) {
+      updates.push('name = ?');
+      params.push(data.name.toString());
+    }
+    if (data.description !== undefined) {
+      updates.push('description = ?');
+      params.push(data.description.toString());
+    }
+
+    if (updates.length > 0) {
+      updates.push('updated_at = ?');
+      params.push(Date.now());
+      params.push(id);
+      db.run(`UPDATE test_suites SET ${updates.join(', ')} WHERE id = ?`, params);
+      saveDatabase();
+    }
+
+    return this.getSuite(id);
+  }
+
+  deleteSuite(id: string): boolean {
+    try {
+      const db = getDatabase();
+      const existing = db.exec('SELECT id FROM test_suites WHERE id = ?', [id]);
+      if (existing.length === 0 || existing[0].values.length === 0) return false;
+      db.run('DELETE FROM test_suites WHERE id = ?', [id]);
+      saveDatabase();
+      return true;
+    } catch (err) {
+      console.error('deleteSuite 错误:', err);
+      return false;
+    }
+  }
+
+  createCase(suiteId: string, data: Partial<TestCase>): TestCase | null {
+    const suite = this.getSuite(suiteId);
+    if (!suite) return null;
+    const c = this.createCaseInternal(suiteId, data);
+    saveDatabase();
+    return c;
+  }
+
+  updateCase(caseId: string, data: Partial<TestCase>): TestCase | null {
+    const existing = this.getCase(caseId);
+    if (!existing) return null;
+
+    const db = getDatabase();
+    const updates: string[] = [];
+    const params: any[] = [];
+
+    if (data.name !== undefined) {
+      updates.push('name = ?');
+      params.push(data.name.toString());
+    }
+    if (data.input !== undefined) {
+      updates.push('input = ?');
+      params.push(data.input.toString());
+    }
+    if (data.expectedOutput !== undefined) {
+      updates.push('expected_output = ?');
+      params.push(data.expectedOutput.toString());
+    }
+    if (data.expectedContains !== undefined) {
+      updates.push('expected_contains_json = ?');
+      params.push(JSON.stringify(this.normalizeExpectedContains(data.expectedContains)));
+    }
+    if (data.variables !== undefined) {
+      updates.push('variables_json = ?');
+      params.push(JSON.stringify(data.variables));
+    }
+
+    if (updates.length > 0) {
+      updates.push('updated_at = ?');
+      params.push(Date.now());
+      params.push(caseId);
+      db.run(`UPDATE test_cases SET ${updates.join(', ')} WHERE id = ?`, params);
+      saveDatabase();
+    }
+
+    return this.getCase(caseId);
+  }
+
+  deleteCase(caseId: string): boolean {
+    try {
+      const db = getDatabase();
+      const existing = db.exec('SELECT id FROM test_cases WHERE id = ?', [caseId]);
+      if (existing.length === 0 || existing[0].values.length === 0) return false;
+      db.run('DELETE FROM test_cases WHERE id = ?', [caseId]);
+      saveDatabase();
+      return true;
+    } catch (err) {
+      console.error('deleteCase 错误:', err);
+      return false;
+    }
+  }
+
+  async runSuite(suiteId: string): Promise<TestRun | null> {
+    const suite = this.getSuite(suiteId);
+    if (!suite) return null;
+
+    const agent = agentRuntime.getAgent(suite.agentId);
+    if (!agent) return null;
+
+    const results: TestRunResult[] = [];
+    let passed = 0;
+    let failed = 0;
+
+    for (const testCase of suite.cases) {
+      const start = Date.now();
+      let output = '';
+      let error: string | undefined;
+      let ok = false;
+      try {
+        const tempConv = sessionManager.createConversation(agent.id, `测试: ${testCase.name}`);
+        await sessionManager.updateVariables(tempConv.id, testCase.variables || {});
+        const msg = await agentRuntime.processMessage(tempConv.id, testCase.input);
+        output = msg?.content || '';
+        sessionManager.deleteConversation(tempConv.id);
+
+        ok = this.evaluateCase(testCase, output);
+      } catch (err: any) {
+        error = err?.message || String(err);
+        output = error || '';
+      }
+      const duration = Date.now() - start;
+      if (ok) passed++; else failed++;
+      results.push({ caseId: testCase.id, passed: ok, output, duration, error });
+    }
+
+    const run: TestRun = {
+      id: uuidv4(),
+      suiteId,
+      agentId: agent.id,
+      results,
+      passed,
+      failed,
+      createdAt: Date.now()
+    };
+
+    const db = getDatabase();
+    db.run(`
+      INSERT INTO test_runs (id, suite_id, agent_id, results_json, passed, failed, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [run.id, suiteId, agent.id, JSON.stringify(results), passed, failed, run.createdAt]);
+    saveDatabase();
+
+    return run;
+  }
+
+  listRuns(suiteId: string): TestRun[] {
+    try {
+      const db = getDatabase();
+      const result = db.exec('SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC', [suiteId]);
+      if (result.length === 0) return [];
+      const columns = result[0].columns;
+      return result[0].values.map(row => {
+        const r: any = {};
+        columns.forEach((col, idx) => r[col] = row[idx]);
+        return {
+          id: r.id,
+          suiteId: r.suite_id,
+          agentId: r.agent_id,
+          results: safeJsonParse(r.results_json, []),
+          passed: r.passed,
+          failed: r.failed,
+          createdAt: r.created_at
+        };
+      });
+    } catch (err) {
+      console.error('listRuns 错误:', err);
+      return [];
+    }
+  }
+
+  private normalizeExpectedContains(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.map(v => String(v).trim()).filter(Boolean);
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.split(',').map(s => s.trim()).filter(Boolean);
+    }
+    return [];
+  }
+
+  private evaluateCase(testCase: TestCase, output: string): boolean {
+    if (testCase.expectedOutput !== undefined && testCase.expectedOutput !== null && testCase.expectedOutput !== '') {
+      return output.trim() === testCase.expectedOutput.trim();
+    }
+    if (testCase.expectedContains && testCase.expectedContains.length > 0) {
+      return testCase.expectedContains.every(c => output.includes(c));
+    }
+    return output.trim().length > 0;
+  }
+
+  private createCaseInternal(suiteId: string, data: Partial<TestCase>): TestCase {
+    const db = getDatabase();
+    const now = Date.now();
+    const id = uuidv4();
+    const name = (data.name || '未命名用例').toString();
+    const input = (data.input || '').toString();
+    const expectedOutput = (data.expectedOutput || '').toString();
+    const expectedContains = this.normalizeExpectedContains(data.expectedContains);
+    const variables = data.variables || {};
+
+    db.run(`
+      INSERT INTO test_cases (id, suite_id, name, input, expected_output, expected_contains_json, variables_json, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `, [id, suiteId, name, input, expectedOutput, JSON.stringify(expectedContains), JSON.stringify(variables), now, now]);
+
+    return {
+      id,
+      suiteId,
+      name,
+      input,
+      expectedOutput,
+      expectedContains,
+      variables,
+      createdAt: now,
+      updatedAt: now
+    };
+  }
+
+  private getCase(id: string): TestCase | null {
+    try {
+      const db = getDatabase();
+      const result = db.exec('SELECT * FROM test_cases WHERE id = ?', [id]);
+      if (result.length === 0 || result[0].values.length === 0) return null;
+      return this.rowToCase(result[0].columns, result[0].values[0]);
+    } catch (err) {
+      console.error('getCase 错误:', err);
+      return null;
+    }
+  }
+
+  private rowToSuite(columns: string[], row: any[]): TestSuite {
+    const s: any = {};
+    columns.forEach((col, idx) => s[col] = row[idx]);
+    return {
+      id: s.id,
+      agentId: s.agent_id,
+      name: s.name,
+      description: s.description,
+      cases: this.getSuiteCases(s.id),
+      createdAt: s.created_at,
+      updatedAt: s.updated_at
+    };
+  }
+
+  private getSuiteCases(suiteId: string): TestCase[] {
+    try {
+      const db = getDatabase();
+      const result = db.exec('SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC', [suiteId]);
+      if (result.length === 0) return [];
+      return result[0].values.map(row => this.rowToCase(result[0].columns, row));
+    } catch (err) {
+      console.error('getSuiteCases 错误:', err);
+      return [];
+    }
+  }
+
+  private rowToCase(columns: string[], row: any[]): TestCase {
+    const c: any = {};
+    columns.forEach((col, idx) => c[col] = row[idx]);
+    return {
+      id: c.id,
+      suiteId: c.suite_id,
+      name: c.name,
+      input: c.input,
+      expectedOutput: c.expected_output,
+      expectedContains: safeJsonParse(c.expected_contains_json, []),
+      variables: safeJsonParse(c.variables_json, {}),
+      createdAt: c.created_at,
+      updatedAt: c.updated_at
+    };
+  }
+}
+
+function safeJsonParse<T>(value: any, fallback: T): T {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export const testSuiteManager = new TestSuiteManager();
