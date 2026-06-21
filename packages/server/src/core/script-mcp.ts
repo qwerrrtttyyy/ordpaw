@@ -3,9 +3,10 @@ import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import vm from 'node:vm';
 import type { Script, ScriptExecutionResult, ScriptTool, ScriptToolCall } from '@ordpaw/shared';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
-import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { queryAll, queryOne } from '../db/utils.js';
 import { logger } from './logger.js';
 
 const scriptsDir = join(process.cwd(), 'data', 'scripts');
@@ -19,7 +20,7 @@ const DEFAULT_PRESETS: Record<string, Script> = {
     code: `function main(args) {\n  const name = args.name || 'world';\n  return { greeting: 'Hello, ' + name + '!'};\n}\n\nmain($args);`,
     language: 'javascript',
     createdAt: Date.now(),
-    updatedAt: Date.now()
+    updatedAt: Date.now(),
   },
   'preset-calc': {
     id: 'preset-calc',
@@ -28,8 +29,8 @@ const DEFAULT_PRESETS: Record<string, Script> = {
     code: `function main(args) {\n  const op = args.op || 'add';\n  const a = Number(args.a || 0);\n  const b = Number(args.b || 0);\n  switch (op) {\n    case 'add': return { result: a + b };\n    case 'sub': return { result: a - b };\n    case 'mul': return { result: a * b };\n    case 'div': return { result: b === 0 ? 'Error: division by zero' : a / b };\n    default: return { error: 'Unknown operation' };\n  }\n}\nmain($args);`,
     language: 'javascript',
     createdAt: Date.now(),
-    updatedAt: Date.now()
-  }
+    updatedAt: Date.now(),
+  },
 };
 
 /** Max wall-clock time a script is allowed to run before we kill it. */
@@ -55,10 +56,10 @@ export class ScriptMcp {
           type: 'object',
           properties: {
             name: { type: 'string', description: 'Unique script name' },
-            description: { type: 'string' }
+            description: { type: 'string' },
           },
-          required: ['name']
-        }
+          required: ['name'],
+        },
       },
       {
         name: 'script_write',
@@ -68,10 +69,10 @@ export class ScriptMcp {
           properties: {
             name: { type: 'string' },
             code: { type: 'string' },
-            language: { type: 'string', enum: ['javascript', 'typescript', 'python'] }
+            language: { type: 'string', enum: ['javascript', 'typescript', 'python'] },
           },
-          required: ['name', 'code']
-        }
+          required: ['name', 'code'],
+        },
       },
       {
         name: 'script_save',
@@ -81,10 +82,10 @@ export class ScriptMcp {
           properties: {
             name: { type: 'string' },
             code: { type: 'string' },
-            description: { type: 'string' }
+            description: { type: 'string' },
           },
-          required: ['name', 'code']
-        }
+          required: ['name', 'code'],
+        },
       },
       {
         name: 'script_delete',
@@ -92,8 +93,8 @@ export class ScriptMcp {
         parameters: {
           type: 'object',
           properties: { name: { type: 'string' } },
-          required: ['name']
-        }
+          required: ['name'],
+        },
       },
       {
         name: 'script_remove',
@@ -101,13 +102,13 @@ export class ScriptMcp {
         parameters: {
           type: 'object',
           properties: { name: { type: 'string' } },
-          required: ['name']
-        }
+          required: ['name'],
+        },
       },
       {
         name: 'script_list',
         description: 'List all available scripts.',
-        parameters: { type: 'object', properties: {} }
+        parameters: { type: 'object', properties: {} },
       },
       {
         name: 'script_use',
@@ -116,11 +117,11 @@ export class ScriptMcp {
           type: 'object',
           properties: {
             name: { type: 'string' },
-            args: { type: 'object' }
+            args: { type: 'object' },
           },
-          required: ['name']
-        }
-      }
+          required: ['name'],
+        },
+      },
     ];
   }
 
@@ -140,26 +141,42 @@ export class ScriptMcp {
 
   listScripts(): Script[] {
     const db = getDatabase();
-    const rows = queryAll<Record<string, unknown>>(db, 'SELECT * FROM scripts ORDER BY updated_at DESC');
-    return rows.map(row => this.rowToScript(row));
+    const rows = queryAll<Record<string, unknown>>(
+      db,
+      'SELECT * FROM scripts ORDER BY updated_at DESC'
+    );
+    return rows.map((row) => this.rowToScript(row));
   }
 
   getScript(idOrName: string): Script | null {
     const db = getDatabase();
-    let row = queryOne<Record<string, unknown>>(db, 'SELECT * FROM scripts WHERE id = ?', [idOrName]);
-    if (!row) row = queryOne<Record<string, unknown>>(db, 'SELECT * FROM scripts WHERE name = ?', [idOrName]);
+    let row = queryOne<Record<string, unknown>>(db, 'SELECT * FROM scripts WHERE id = ?', [
+      idOrName,
+    ]);
+    if (!row)
+      row = queryOne<Record<string, unknown>>(db, 'SELECT * FROM scripts WHERE name = ?', [
+        idOrName,
+      ]);
     if (!row) return null;
     return this.rowToScript(row);
   }
 
-  createScript(data: { name: string; description?: string; code?: string; language?: string }): Script {
+  createScript(data: {
+    name: string;
+    description?: string;
+    code?: string;
+    language?: string;
+  }): Script {
     const db = getDatabase();
     const normalizedName = data.name.trim();
-    if (!normalizedName) throw new Error('Script name is required');
+    if (!normalizedName)
+      throw new OrdPawError('Script name is required', { code: OrdPawErrorCode.BAD_REQUEST });
 
     const existing = queryOne(db, 'SELECT id FROM scripts WHERE name = ?', [normalizedName]);
     if (existing) {
-      throw new Error(`Script "${normalizedName}" already exists`);
+      throw new OrdPawError(`Script "${normalizedName}" already exists`, {
+        code: OrdPawErrorCode.CONFLICT,
+      });
     }
 
     const script: Script = {
@@ -169,7 +186,7 @@ export class ScriptMcp {
       code: data.code || '',
       language: this.normalizeLanguage(data.language),
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
 
     this.saveScriptRecord(script, true);
@@ -184,9 +201,14 @@ export class ScriptMcp {
       const normalizedName = data.name.trim();
       if (normalizedName && normalizedName !== script.name) {
         const db = getDatabase();
-        const existing = queryOne(db, 'SELECT id FROM scripts WHERE name = ? AND id != ?', [normalizedName, script.id]);
+        const existing = queryOne(db, 'SELECT id FROM scripts WHERE name = ? AND id != ?', [
+          normalizedName,
+          script.id,
+        ]);
         if (existing) {
-          throw new Error(`Script name "${normalizedName}" already in use`);
+          throw new OrdPawError(`Script name "${normalizedName}" already in use`, {
+            code: OrdPawErrorCode.CONFLICT,
+          });
         }
         script.name = normalizedName;
       }
@@ -211,16 +233,25 @@ export class ScriptMcp {
 
     const filePath = join(scriptsDir, `${script.id}.js`);
     if (existsSync(filePath)) {
-      try { unlinkSync(filePath); } catch {}
+      try {
+        unlinkSync(filePath);
+      } catch {
+        /* ignore unlink errors */
+      }
     }
 
     eventBus.emit('script:deleted', { id: script.id, name: script.name });
     return true;
   }
 
-  async executeScript(idOrName: string, args: Record<string, unknown> = {}, context: Record<string, unknown> = {}): Promise<ScriptExecutionResult> {
+  async executeScript(
+    idOrName: string,
+    args: Record<string, unknown> = {},
+    context: Record<string, unknown> = {}
+  ): Promise<ScriptExecutionResult> {
     const script = this.getScript(idOrName);
-    if (!script) return { success: false, error: `Script not found: ${idOrName}`, logs: [], duration: 0 };
+    if (!script)
+      return { success: false, error: `Script not found: ${idOrName}`, logs: [], duration: 0 };
 
     const start = Date.now();
     const logs: string[] = [];
@@ -228,12 +259,23 @@ export class ScriptMcp {
     try {
       const result = this.runInSandbox(script.code, args, context, logs);
       const duration = Date.now() - start;
-      eventBus.emit('script:executed', { id: script.id, name: script.name, duration, success: true });
+      eventBus.emit('script:executed', {
+        id: script.id,
+        name: script.name,
+        duration,
+        success: true,
+      });
       return { success: true, output: result, logs, duration };
     } catch (err: unknown) {
       const duration = Date.now() - start;
       const message = err instanceof Error ? err.message : String(err);
-      eventBus.emit('script:executed', { id: script.id, name: script.name, duration, success: false, error: message });
+      eventBus.emit('script:executed', {
+        id: script.id,
+        name: script.name,
+        duration,
+        success: false,
+        error: message,
+      });
       return { success: false, error: message, logs, duration };
     }
   }
@@ -243,15 +285,29 @@ export class ScriptMcp {
     switch (tool) {
       case 'script_create': {
         const script = this.createScript({ name: params.name, description: params.description });
-        return { success: true, output: { id: script.id, name: script.name }, logs: [], duration: 0 };
+        return {
+          success: true,
+          output: { id: script.id, name: script.name },
+          logs: [],
+          duration: 0,
+        };
       }
       case 'script_write':
       case 'script_save': {
         const script = this.getScript(params.name);
         if (script) {
-          this.updateScript(script.id, { code: params.code, language: params.language, description: params.description });
+          this.updateScript(script.id, {
+            code: params.code,
+            language: params.language,
+            description: params.description,
+          });
         } else {
-          this.createScript({ name: params.name, code: params.code, description: params.description, language: params.language });
+          this.createScript({
+            name: params.name,
+            code: params.code,
+            description: params.description,
+            language: params.language,
+          });
         }
         return { success: true, output: { name: params.name }, logs: [], duration: 0 };
       }
@@ -262,7 +318,12 @@ export class ScriptMcp {
       }
       case 'script_list': {
         const scripts = this.listScripts();
-        return { success: true, output: scripts.map(s => ({ id: s.id, name: s.name, description: s.description })), logs: [], duration: 0 };
+        return {
+          success: true,
+          output: scripts.map((s) => ({ id: s.id, name: s.name, description: s.description })),
+          logs: [],
+          duration: 0,
+        };
       }
       case 'script_use': {
         return this.executeScript(params.name, params.args || {});
@@ -280,15 +341,29 @@ export class ScriptMcp {
   private saveScriptRecord(script: Script, isNew: boolean) {
     const db = getDatabase();
     if (isNew) {
-      db.run(`
+      db.run(
+        `
         INSERT INTO scripts (id, name, description, code, language, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-      `, [script.id, script.name, script.description, script.code, script.language, script.createdAt, script.updatedAt]);
+      `,
+        [
+          script.id,
+          script.name,
+          script.description,
+          script.code,
+          script.language,
+          script.createdAt,
+          script.updatedAt,
+        ]
+      );
     } else {
-      db.run(`
+      db.run(
+        `
         UPDATE scripts SET name = ?, description = ?, code = ?, language = ?, updated_at = ?
         WHERE id = ?
-      `, [script.name, script.description, script.code, script.language, script.updatedAt, script.id]);
+      `,
+        [script.name, script.description, script.code, script.language, script.updatedAt, script.id]
+      );
     }
     saveDatabase();
     this.persistToFile(script);
@@ -298,7 +373,11 @@ export class ScriptMcp {
   private persistToFile(script: Script) {
     const filePath = join(scriptsDir, `${script.id}.js`);
     try {
-      writeFileSync(filePath, `// ${script.name}\n// ${script.description}\n\n${script.code}\n`, 'utf-8');
+      writeFileSync(
+        filePath,
+        `// ${script.name}\n// ${script.description}\n\n${script.code}\n`,
+        'utf-8'
+      );
     } catch (err) {
       logger.error(err, 'Failed to persist script to file');
     }
@@ -316,7 +395,12 @@ export class ScriptMcp {
    * 3. Wall-clock timeout via `vm.Script` + `script.runInContext({ timeout })`.
    * 4. console.log/warn/error captured into the logs array.
    */
-  private runInSandbox(code: string, args: Record<string, unknown>, context: Record<string, unknown>, logs: string[]): unknown {
+  private runInSandbox(
+    code: string,
+    args: Record<string, unknown>,
+    context: Record<string, unknown>,
+    logs: string[]
+  ): unknown {
     // Wrap user code in an IIFE so `return ...` works.
     // The vm context provides all standard JS globals (Math, JSON, Date, etc.)
     // automatically — we only need to inject our helpers.
@@ -328,8 +412,11 @@ export class ScriptMcp {
     // user code defines a `main` function but doesn't already return its
     // result explicitly.
     const hasReturnStmt = /\breturn\s+main\s*\(/.test(code);
-    const definesMain = /\bfunction\s+main\s*\(/.test(code) || /\bconst\s+main\s*=/.test(code) || /\blet\s+main\s*=/.test(code);
-    const trailer = (!hasReturnStmt && definesMain) ? '\nreturn main($args);' : '';
+    const definesMain =
+      /\bfunction\s+main\s*\(/.test(code) ||
+      /\bconst\s+main\s*=/.test(code) ||
+      /\blet\s+main\s*=/.test(code);
+    const trailer = !hasReturnStmt && definesMain ? '\nreturn main($args);' : '';
 
     const wrapped = `(function() {
       "use strict";
@@ -375,7 +462,7 @@ export class ScriptMcp {
       isNaN,
       isFinite,
       encodeURIComponent,
-      decodeURIComponent
+      decodeURIComponent,
     };
 
     const contextObj = vm.createContext(sandbox);
@@ -384,7 +471,7 @@ export class ScriptMcp {
     // runInContext supports a `timeout` option that aborts infinite loops.
     const result = scriptObj.runInContext(contextObj, {
       timeout: SCRIPT_TIMEOUT_MS,
-      breakOnSigint: true
+      breakOnSigint: true,
     });
 
     return result;
@@ -398,7 +485,7 @@ export class ScriptMcp {
       code: String(row.code || ''),
       language: String(row.language || 'javascript') as Script['language'],
       createdAt: Number(row.created_at || Date.now()),
-      updatedAt: Number(row.updated_at || Date.now())
+      updatedAt: Number(row.updated_at || Date.now()),
     };
   }
 }

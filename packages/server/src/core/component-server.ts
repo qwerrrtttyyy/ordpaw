@@ -1,6 +1,5 @@
 import { Router, static as serveStatic, type IRouter } from 'express';
-import { existsSync } from 'fs';
-import { join, resolve } from 'path';
+import { join } from 'path';
 import type { ComponentContribution } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { queryAll, safeJsonParse } from '../db/utils.js';
@@ -39,12 +38,12 @@ class ComponentServerImpl {
   register(pluginName: string, contributions: ComponentContribution[], pluginPath: string) {
     this.pluginPaths.set(pluginName, pluginPath);
 
-    this.contributions = this.contributions.filter(c => c.metadata?.__plugin !== pluginName);
+    this.contributions = this.contributions.filter((c) => c.metadata?.__plugin !== pluginName);
 
-    const normalized = contributions.map(c => ({
+    const normalized = contributions.map((c) => ({
       ...c,
       src: this.normalizeSrc(pluginName, c.src),
-      metadata: { ...(c.metadata || {}), __plugin: pluginName }
+      metadata: { ...(c.metadata || {}), __plugin: pluginName },
     }));
     this.contributions.push(...normalized);
 
@@ -63,7 +62,7 @@ class ComponentServerImpl {
 
   unregister(pluginName: string): boolean {
     const before = this.contributions.length;
-    this.contributions = this.contributions.filter(c => c.metadata?.__plugin !== pluginName);
+    this.contributions = this.contributions.filter((c) => c.metadata?.__plugin !== pluginName);
     this.pluginPaths.delete(pluginName);
     const db = getDatabase();
     db.run('DELETE FROM components WHERE plugin_name = ?', [pluginName]);
@@ -82,12 +81,14 @@ class ComponentServerImpl {
   } {
     return {
       root: this.componentTree.root,
-      relationships: Array.from(this.componentTree.relationships.entries()).flatMap(([from, list]) => list.map(to => ({ from, to })))
+      relationships: Array.from(this.componentTree.relationships.entries()).flatMap(
+        ([from, list]) => list.map((to) => ({ from, to }))
+      ),
     };
   }
 
   getNodesByPlugin(plugin: string): ComponentContribution[] {
-    return this.contributions.filter(c => c.metadata?.__plugin === plugin);
+    return this.contributions.filter((c) => c.metadata?.__plugin === plugin);
   }
 
   getPlugins(): string[] {
@@ -111,7 +112,7 @@ class ComponentServerImpl {
       totalComponents: this.contributions.length,
       totalPlugins: this.pluginPaths.size,
       byType,
-      byPlugin
+      byPlugin,
     };
   }
 
@@ -121,7 +122,7 @@ class ComponentServerImpl {
     router.get('/manifest', (_req, res) => {
       res.json({
         version: '0.0.3',
-        items: this.getManifest()
+        items: this.getManifest(),
       });
     });
 
@@ -130,7 +131,9 @@ class ComponentServerImpl {
     });
 
     router.get('/relationships', (_req, res) => {
-      const relationships = Array.from(this.componentTree.relationships.entries()).map(([from, to]) => ({ from, to }));
+      const relationships = Array.from(this.componentTree.relationships.entries()).map(
+        ([from, to]) => ({ from, to })
+      );
       res.json({ relationships });
     });
 
@@ -154,8 +157,10 @@ class ComponentServerImpl {
           res.status(400).json({ error: 'Invalid payload. Expected { plugin, contributions[] }.' });
           return;
         }
-        const path = body.plugin === 'ordpaw-core' ? join(process.cwd(), 'src') :
-          this.pluginPaths.get(body.plugin) || join(PLUGINS_DIR, body.plugin);
+        const path =
+          body.plugin === 'ordpaw-core'
+            ? join(process.cwd(), 'src')
+            : this.pluginPaths.get(body.plugin) || join(PLUGINS_DIR, body.plugin);
         this.register(body.plugin, body.contributions, path);
         res.json({ registered: body.plugin, count: this.getNodesByPlugin(body.plugin).length });
       } catch (err) {
@@ -177,7 +182,7 @@ class ComponentServerImpl {
       }
       const staticHandler = serveStatic(pluginPath, {
         fallthrough: false,
-        index: false
+        index: false,
       });
       staticHandler(req, res, next);
     });
@@ -197,10 +202,22 @@ class ComponentServerImpl {
       db.run('DELETE FROM components WHERE plugin_name = ?', [pluginName]);
       for (const c of contributions) {
         const id = `${pluginName}:${c.name}`;
-        db.run(`
+        db.run(
+          `
           INSERT INTO components (id, plugin_name, type, name, src, slot, metadata_json, created_at)
           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        `, [id, pluginName, c.type, c.name, c.src, c.slot || null, JSON.stringify(c.metadata || {}), Date.now()]);
+        `,
+          [
+            id,
+            pluginName,
+            c.type,
+            c.name,
+            c.src,
+            c.slot || null,
+            JSON.stringify(c.metadata || {}),
+            Date.now(),
+          ]
+        );
       }
       saveDatabase();
     } catch (err) {
@@ -213,14 +230,20 @@ class ComponentServerImpl {
   loadFromDatabase() {
     try {
       const db = getDatabase();
-      const rows = queryAll<Record<string, unknown>>(db, 'SELECT * FROM components ORDER BY created_at ASC');
-      this.contributions = rows.map(c => ({
-        type: String(c.type),
-        name: String(c.name),
-        src: String(c.src),
-        slot: c.slot === null || c.slot === undefined ? undefined : String(c.slot),
-        metadata: safeJsonParse<Record<string, unknown>>(c.metadata_json, {})
-      }) as ComponentContribution);
+      const rows = queryAll<Record<string, unknown>>(
+        db,
+        'SELECT * FROM components ORDER BY created_at ASC'
+      );
+      this.contributions = rows.map(
+        (c) =>
+          ({
+            type: String(c.type),
+            name: String(c.name),
+            src: String(c.src),
+            slot: c.slot === null || c.slot === undefined ? undefined : String(c.slot),
+            metadata: safeJsonParse<Record<string, unknown>>(c.metadata_json, {}),
+          }) as ComponentContribution
+      );
       this.buildComponentTree();
     } catch (err) {
       logger.error(err, 'loadFromDatabase 组件失败');
@@ -242,7 +265,7 @@ class ComponentServerImpl {
         slot: c.slot,
         plugin: c.metadata?.__plugin || 'unknown',
         children: [],
-        metadata: c.metadata || {}
+        metadata: c.metadata || {},
       };
       nodeMap.set(id, node);
     }
@@ -255,7 +278,9 @@ class ComponentServerImpl {
         const key = `${node.plugin}:${node.slot}`;
         let parent = byName.get(key);
         if (!parent) {
-          parent = Array.from(nodeMap.values()).find(p => p.name === node.slot && p.id !== node.id);
+          parent = Array.from(nodeMap.values()).find(
+            (p) => p.name === node.slot && p.id !== node.id
+          );
         }
         if (parent) {
           parent.children.push(node);
@@ -269,7 +294,7 @@ class ComponentServerImpl {
     }
 
     // 去重：根节点不应该包含任何父节点
-    const dedupRoots = rootNodes.filter(n => !n.parent || !nodeMap.has(n.parent));
+    const dedupRoots = rootNodes.filter((n) => !n.parent || !nodeMap.has(n.parent));
     this.componentTree = { root: dedupRoots, relationships };
   }
 }

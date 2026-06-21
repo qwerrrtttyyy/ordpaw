@@ -1,142 +1,143 @@
-# OrdPaw — A powerful AI/Agent client
+# OrdPaw
 
-OrdPaw is a full-stack AI Agent development and debugging platform with a focus on developer UX, plugin extensibility, and protocol interoperability.
+[![CI](https://github.com/ordpaw/ordpaw/actions/workflows/ci.yml/badge.svg)](https://github.com/ordpaw/ordpaw/actions/workflows/ci.yml)
 
-**Version: v0.0.1** (reset)
+OrdPaw 是一个面向开发者的全栈 AI Agent 开发、调试与运行平台。它提供可扩展的插件系统、统一的 LLM 服务接入、会话管理、组件化前端，以及用于多版本共存的命令行版本管理工具 `ordpaw-vm`。
 
-## Architecture
+**当前版本：v0.0.3**
+
+## 特性
+
+- **Agent Workbench** — 创建、配置并管理 AI Agent
+- **多服务商接入** — 支持 OpenAI 兼容端点与 Anthropic Messages API
+- **会话与历史** — 多轮对话、检查点、时间旅行回滚
+- **插件与组件** — 事件驱动钩子 + 前端组件贡献
+- **Skills Engine** — 基于 JSON Schema 的可插拔技能定义
+- **MCP Client** — Model Context Protocol（stdio / SSE / WebSocket）
+- **ScriptMCP** — 在隔离的 `node:vm` 沙箱中执行用户脚本
+- **Debug Center** — 实时日志、事件追踪、性能分析
+- **多主题 UI** — 多套主题 + 经典 / 现代界面模式
+- **下载管理** — 浏览器端与服务端下载队列及配额控制
+- **版本管理** — `ordpaw-vm` 让多个 OrdPaw 版本并行安装、切换
+
+## 项目结构
 
 ```
 ordpaw/
 ├── packages/
-│   ├── client/        # Frontend SPA (TypeScript + Vite, no framework)
-│   ├── server/        # Backend (Node.js + Express + WebSocket)
-│   └── shared/        # Shared TypeScript types
-├── data/              # SQLite database + scripts (auto-created)
-├── plugins/           # User plugin directory
+│   ├── client/        # 前端 SPA（TypeScript + Vite，无框架）
+│   ├── server/        # 后端（Node.js + Express + WebSocket）
+│   ├── shared/        # 共享 TypeScript 类型
+│   └── vm/            # 版本管理 CLI（ordpaw-vm）
+├── data/              # SQLite 数据库 + 脚本（运行后自动创建）
+├── plugins/           # 用户插件目录
 └── pnpm-workspace.yaml
 ```
 
-## Features
+## 安装
 
-- **Agent Workbench** — Build, configure, and manage AI agents
-- **Real LLM Calls** — OpenAI-compatible and Anthropic Messages API support
-- **Conversation Management** — Session history, checkpoints, time-travel rollback
-- **Plugin System** — JavaScript plugins with event-driven hooks + frontend contributions
-- **Skills Engine** — Pluggable skill definitions with JSON Schema
-- **MCP Client** — Model Context Protocol (stdio/SSE/WebSocket)
-- **ScriptMCP** — User JS scripts executed in an isolated `node:vm` sandbox
-- **Debug Center** — Real-time logs, event tracing, performance analysis
-- **Prompt Library** — Template management with variable interpolation
-- **Multi-theme** — 8 themes (Deep Space, Aurora, Cyber, etc.) + Classic / Modern UI modes
-- **Download Manager** — Browser (IndexedDB/FSA/localStorage) + server-side downloads with quota
-
-## What's Fixed in v0.0.1
-
-This release rebuilds the codebase from the legacy `agent-studio` snapshot and addresses every issue identified in the deep-read audit:
-
-### Backend
-1. **Real LLM calls** — `agentRuntime.processMessage` now actually calls the provider (OpenAI-compatible `/v1/chat/completions` or Anthropic `/v1/messages`). Falls back to a diagnostic message when the provider or API key is missing.
-2. **Sandboxed script execution** — `scriptMcp` switched from `new Function + eval` (trivially escapable to `process.exit()`) to `node:vm.createContext` with an allow-list of safe globals and a 5-second wall-clock timeout. Verified: `typeof process === 'undefined'` inside user scripts.
-3. **WebSocket listener leak fixed** — `ws/handler.ts` now properly calls `eventBus.off(...)` on `ws.close` instead of relying on `readyState` short-circuits.
-4. **CJK-friendly streaming** — the chat-stream chunker now respects CJK characters (one char per chunk) instead of splitting on ASCII spaces only.
-5. **Checkpoint rollback repaired** — uses snapshot restoration (delete all + re-insert from `state_json`) instead of fragile timestamp-`>` deletion that lost same-millisecond messages; also deletes future checkpoints after a rollback.
-6. **API key obfuscation** — `providers.api_key` no longer stores plaintext. XOR+base64 obfuscation keyed by `ORDPAW_DB_SECRET` env var; responses strip the key and return only `hasApiKey: boolean`.
-7. **DB filename** — `agent-studio.db` (legacy rename artifact) → `ordpaw.db`. Auto-migrates the legacy file on first run.
-8. **Shared DB helpers** — `safeJsonParse`, `rowToObject`, `queryAll`, `queryOne`, `safeCount` extracted to `db/utils.ts`, removing 8 copies of the same code.
-9. **Cache key namespace fix** — `componentServer` no longer pollutes `providerModelsCache` key space (uses `__components__:<plugin>` prefix).
-10. **Export filename** — `agent-studio-export-*.json` → `ordpaw-export-*.json`.
-
-### Frontend
-1. **Unified fetch wrapper** — `api.ts` now uses a single `request()` helper that checks `res.ok`, parses JSON safely (tolerates empty bodies), and throws typed errors with status code and server-provided message. No more silent 4xx/5xx responses being rendered as fake data.
-2. **Plugin registry** — new `plugin-registry.ts` exposes `window.OrdPaw` (registered by `App.init`) with `registerActionHandler`, `emit`, `on`, `toast`, `getSettings`. Plugins can finally extend the SPA without monkey-patching internals.
-3. **Live plugin reload** — `PluginsView` now calls `reloadPluginComponents()` after install/uninstall, so newly-installed plugin CSS/scripts are injected without a page refresh.
-4. **Vite dev-proxy friendly WebSocket** — `App.initWebSocket` honors the dev server port instead of hard-coding `:3000`, so the proxy actually works.
-5. **Shared utilities** — `utils.ts` provides `escapeHtml`, `formatRelativeTime`, `showToast`, `createModal`, deduplicating 5+ copies across views.
-6. **i18n consistency** — `ConversationsView` and `PluginsView` now use `t()` for all strings; new locale-aware `formatRelativeTime` replaces hardcoded Chinese relative time.
-7. **`BottomNav.setCounts` is no longer a stub** — shows a small badge with the agent / conversation / test-suite count next to the relevant tab.
-8. **`styles-modern.css` cleanup** — removed 70+ duplicated v3.0 revision blocks (file went from 11,220 lines to ~1,748 lines, an 84% reduction) while preserving the v2.5 base + a consolidated v3.0 palette overlay.
-
-## Quick Start
+需要 Node.js >= 18 与 pnpm。
 
 ```bash
-# Install dependencies
 pnpm install
+```
 
-# Start both server and client in dev mode
+安装完成后，`husky` 会自动配置 pre-commit 钩子，对暂存文件执行 lint 与格式化。
+
+## 开发
+
+```bash
+# 同时启动前后端
 pnpm dev
 
-# Or start individually
+# 单独启动
 pnpm dev:server
 pnpm dev:client
 ```
 
-The server listens on `http://localhost:3000`, the Vite dev server on `http://localhost:5173` (proxies `/api` and `/ws` to the backend).
+- 后端：`http://localhost:3000`
+- 前端开发服务器：`http://localhost:5173`（代理 `/api` 与 `/ws` 到后端）
 
-### Configuring an LLM provider
+### 配置 LLM 服务商
 
-1. Open **Settings → API Keys** and add a key for `openai` (or `anthropic`).
-2. Or: edit the provider directly under **Providers** and paste your API key — it will be obfuscated on save.
-3. Create an agent that uses that provider + model.
-4. Start a conversation and chat — real LLM responses will stream back over WebSocket.
+1. 打开 **Settings → API Keys**，为 `openai` 或 `anthropic` 添加 API Key。
+2. 或在 **Providers** 中直接编辑并粘贴 Key（保存时会自动混淆）。
+3. 创建使用该服务商与模型的 Agent。
+4. 开始对话，真实 LLM 响应会通过 WebSocket 流式返回。
 
-For OpenAI-compatible endpoints (Ollama, vLLM, etc.), set the provider's `baseUrl` to your endpoint.
+对于 OpenAI 兼容端点（如 Ollama、vLLM），在服务商配置中将 `baseUrl` 设为目标地址。
 
-## Development
+## 测试
 
 ```bash
-# Type-check client
-cd packages/client && npx tsc --noEmit
+# 运行所有包测试
+pnpm test
 
-# Type-check server
-cd packages/server && npx tsc --noEmit
+# 仅服务端 / 客户端
+pnpm test:server
+pnpm test:client
+
+# 覆盖率（阈值已配置在 vitest.config.ts）
+pnpm test:coverage
 ```
 
-## Project Layout
+## 类型检查
 
+```bash
+pnpm typecheck
 ```
-packages/server/src/
-├── index.ts              # Express + WS bootstrap
-├── api/index.ts          # REST routes (/api/*)
-├── ws/handler.ts         # WebSocket handler
-├── middleware.ts         # asyncHandler, ApiError, validateBody
-├── db/
-│   ├── index.ts          # sql.js init, debounced save
-│   └── utils.ts          # safeJsonParse / rowToObject / queryAll / queryOne / safeCount
-├── plugin/loader.ts      # Filesystem plugin discovery
-└── core/
-    ├── agent-runtime.ts  # processMessage: real LLM calls
-    ├── session.ts        # Conversations + messages
-    ├── checkpoint.ts     # Time-travel snapshots + rollback
-    ├── skill-runner.ts   # In-memory skill registry
-    ├── script-mcp.ts     # ScriptMCP + vm sandbox
-    ├── mcp-client.ts     # External MCP client
-    ├── provider-service.ts # Provider CRUD + key obfuscation
-    ├── api-key-crypto.ts # XOR+base64 obfuscation
-    ├── event-bus.ts      # Async pub/sub with '*' wildcard
-    ├── debug-logger.ts   # Ring-buffered logs/events
-    ├── test-suite.ts     # Test suites + run history
-    ├── sequence-generator.ts # RBAC + rate-limit for UI ops
-    ├── download-service.ts # /api/download/* routes
-    ├── component-server.ts # Plugin frontend component registry
-    └── cache.ts          # TTL caches
 
-packages/client/src/
-├── main.ts               # Entry
-├── app.ts                # Top-level orchestrator
-├── router.ts             # Hash router
-├── store.ts              # Settings cache
-├── api.ts                # Unified fetch wrapper
-├── utils.ts              # escapeHtml, formatRelativeTime, createModal, showToast
-├── component-loader.ts   # Plugin CSS/script injector (reloadable)
-├── plugin-registry.ts    # window.OrdPaw public API
-├── animation-manager.ts  # RAF loop + performance tiers
-├── download-manager.ts   # Browser download queue
-├── sequence-executor.ts  # WS-driven UI automation
-├── i18n/                 # zh-CN, en-US dictionaries
-├── components/           # sidebar, bottom-nav, mobile-drawer, markdown
-├── views/                # dashboard, agents, conversations, providers,
-│                         #   plugins, prompts, scripts, settings, tests,
-│                         #   debug, download-manager
-└── styles.css + styles-modern.css
+## 构建
+
+```bash
+pnpm build
 ```
+
+构建产物位于各包的 `dist/` 目录。
+
+## 代码风格
+
+```bash
+# 检查
+pnpm lint
+pnpm format:check
+
+# 自动修复
+pnpm lint:fix
+pnpm format
+```
+
+## 版本管理工具：ordpaw-vm
+
+`ordpaw-vm` 是一个类似 `nvm` 的 OrdPaw 版本管理 CLI，支持多版本安装、切换与共存。
+
+```bash
+# 安装指定版本
+npx ordpaw-vm install 0.0.3
+
+# 列出已安装版本
+npx ordpaw-vm list
+
+# 查看当前激活版本
+npx ordpaw-vm current
+
+# 切换版本
+npx ordpaw-vm use 0.0.3
+
+# 卸载版本
+npx ordpaw-vm uninstall 0.0.3
+```
+
+版本库存放在 `~/.ordpaw-vm/versions/<version>/`，当前激活版本通过 `~/.ordpaw-vm/current` 符号链接/记录文件管理。
+
+## 贡献
+
+请参阅 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
+## 更新日志
+
+请参阅 [CHANGELOG.md](./CHANGELOG.md)。
+
+## License
+
+MIT

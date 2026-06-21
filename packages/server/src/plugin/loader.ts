@@ -1,7 +1,6 @@
 import { readdirSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
-import db from '../db/index.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { skillRunner } from '../core/skill-runner.js';
 import { eventBus } from '../core/event-bus.js';
@@ -17,7 +16,13 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
   return {
     logger: logger.child({ plugin: pluginName }),
     config: {},
-    registerSkill: (skill: { id: string; name: string; description: string; parameters: unknown; execute: (params: unknown) => Promise<unknown> }) => {
+    registerSkill: (skill: {
+      id: string;
+      name: string;
+      description: string;
+      parameters: unknown;
+      execute: (params: unknown) => Promise<unknown>;
+    }) => {
       skillRunner.registerSkill(skill);
       logger.info(`插件 ${pluginName} 注册了技能: ${skill.name}`);
     },
@@ -39,7 +44,11 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
           [pluginName, key]
         );
         if (!row) return undefined;
-        try { return JSON.parse(row.value_json); } catch { return undefined; }
+        try {
+          return JSON.parse(row.value_json);
+        } catch {
+          return undefined;
+        }
       },
       set: (key: string, value: unknown) => {
         const valueJson = JSON.stringify(value);
@@ -52,10 +61,10 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
         saveDatabase();
       },
       delete: (key: string) => {
-        getDatabase().run(
-          'DELETE FROM plugin_storage WHERE plugin_name = ? AND key = ?',
-          [pluginName, key]
-        );
+        getDatabase().run('DELETE FROM plugin_storage WHERE plugin_name = ? AND key = ?', [
+          pluginName,
+          key,
+        ]);
         saveDatabase();
       },
       list: () => {
@@ -64,16 +73,13 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
           'SELECT key FROM plugin_storage WHERE plugin_name = ? ORDER BY key ASC',
           [pluginName]
         );
-        return rows.map(r => r.key);
+        return rows.map((r) => r.key);
       },
       clear: () => {
-        getDatabase().run(
-          'DELETE FROM plugin_storage WHERE plugin_name = ?',
-          [pluginName]
-        );
+        getDatabase().run('DELETE FROM plugin_storage WHERE plugin_name = ?', [pluginName]);
         saveDatabase();
-      }
-    }
+      },
+    },
   };
 }
 
@@ -84,14 +90,14 @@ export async function loadPlugins() {
   }
 
   const pluginDirs = readdirSync(PLUGINS_DIR, { withFileTypes: true })
-    .filter(dirent => dirent.isDirectory())
-    .map(dirent => dirent.name);
+    .filter((dirent) => dirent.isDirectory())
+    .map((dirent) => dirent.name);
 
   for (const pluginName of pluginDirs) {
     try {
       const pluginPath = join(PLUGINS_DIR, pluginName);
       const manifestPath = join(pluginPath, 'plugin.json');
-      
+
       if (!existsSync(manifestPath)) {
         logger.warn(`插件 ${pluginName} 缺少 plugin.json，跳过`);
         continue;
@@ -124,7 +130,11 @@ export async function loadPlugins() {
 
       // 注册前端组件贡献
       if (manifest.frontend && Array.isArray(manifest.frontend)) {
-        componentServer.register(pluginName, manifest.frontend as ComponentContribution[], pluginPath);
+        componentServer.register(
+          pluginName,
+          manifest.frontend as ComponentContribution[],
+          pluginPath
+        );
         logger.info(`插件 ${pluginName} 注册了 ${manifest.frontend.length} 个前端组件`);
       }
 

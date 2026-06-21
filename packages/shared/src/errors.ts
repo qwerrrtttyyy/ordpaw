@@ -24,6 +24,7 @@ export class OrdPawError extends Error {
   readonly status: number;
   readonly code: OrdPawErrorCode | string;
   readonly details?: unknown;
+  readonly cause?: unknown;
 
   constructor(message: string, options: OrdPawErrorOptions = {}) {
     super(message);
@@ -31,7 +32,10 @@ export class OrdPawError extends Error {
     this.status = options.status ?? 500;
     this.code = options.code ?? OrdPawErrorCode.INTERNAL_ERROR;
     this.details = options.details;
+    if (options.cause !== undefined) {
+      this.cause = options.cause;
+    }
   }
 }
 
-export type ErrorCode = Lowercase<OrdPawErrorCode> | (string & {});
+export type ErrorCode = Lowercase<OrdPawErrorCode> | string;

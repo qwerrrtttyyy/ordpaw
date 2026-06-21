@@ -1,6 +1,7 @@
 import { API } from '../api';
 import { escapeHtml, prefersReducedMotion, debounce, throttle } from '../utils';
 import { t } from '../i18n';
+import { logger } from '../logger';
 
 interface TreeNodeData {
   id: string;
@@ -11,7 +12,7 @@ interface TreeNodeData {
   plugin: string;
   children: TreeNodeData[];
   parent?: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
 }
 
 export class ComponentTreeView {
@@ -110,10 +111,18 @@ export class ComponentTreeView {
     });
 
     this.container.querySelector('#zoom-in-btn')?.addEventListener('click', () => this.zoomBy(0.2));
-    this.container.querySelector('#zoom-out-btn')?.addEventListener('click', () => this.zoomBy(-0.2));
-    this.container.querySelector('#zoom-reset-btn')?.addEventListener('click', () => this.resetView());
-    this.container.querySelector('#expand-all-btn')?.addEventListener('click', () => this.expandAll());
-    this.container.querySelector('#collapse-all-btn')?.addEventListener('click', () => this.collapseAll());
+    this.container
+      .querySelector('#zoom-out-btn')
+      ?.addEventListener('click', () => this.zoomBy(-0.2));
+    this.container
+      .querySelector('#zoom-reset-btn')
+      ?.addEventListener('click', () => this.resetView());
+    this.container
+      .querySelector('#expand-all-btn')
+      ?.addEventListener('click', () => this.expandAll());
+    this.container
+      .querySelector('#collapse-all-btn')
+      ?.addEventListener('click', () => this.collapseAll());
 
     // 使用节流优化拖拽
     const throttledPan = throttle((x: number, y: number) => {
@@ -198,11 +207,11 @@ export class ComponentTreeView {
 
   private async loadComponentTree() {
     try {
-      const tree = await this.api.getComponentTree();
+      const tree = (await this.api.getComponentTree()) as { root: TreeNodeData[] } | null;
       if (tree) {
         const filtered = {
           ...tree,
-          root: this.filterNodes(tree.root || [])
+          root: this.filterNodes(tree.root || []),
         };
         this.renderTree(filtered);
       }
@@ -212,7 +221,10 @@ export class ComponentTreeView {
     }
   }
 
-  private renderTree(tree: unknown) {
+  private renderTree(tree: {
+    root: TreeNodeData[];
+    relationships?: Array<{ from: string; to: string }>;
+  }) {
     const canvas = this.container.querySelector('#tree-canvas') as HTMLElement;
     if (!canvas) return;
 
@@ -250,7 +262,10 @@ export class ComponentTreeView {
     }
   }
 
-  private createTreeVisualization(tree: any): SVGElement {
+  private createTreeVisualization(tree: {
+    root: TreeNodeData[];
+    relationships?: Array<{ from: string; to: string }>;
+  }): SVGElement {
     const width = 1200;
     const height = 800;
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -300,9 +315,9 @@ export class ComponentTreeView {
     // 绘制连接线
     const linksGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     linksGroup.setAttribute('class', 'tree-links');
-    for (const [from, to] of tree.relationships || []) {
-      const fromNode = layout.get(from);
-      const toNode = layout.get(to);
+    for (const rel of tree.relationships || []) {
+      const fromNode = layout.get(rel.from);
+      const toNode = layout.get(rel.to);
       if (fromNode && toNode) {
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         line.setAttribute('d', this.createCurvedPath(fromNode, toNode));
@@ -320,7 +335,7 @@ export class ComponentTreeView {
     const nodesGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     nodesGroup.setAttribute('class', 'tree-nodes');
     for (const [id, pos] of layout.entries()) {
-      const node = nodes.find(n => n.id === id);
+      const node = nodes.find((n) => n.id === id);
       if (node) {
         const nodeGroup = this.createNodeElement(node, pos.x, pos.y);
         nodesGroup.appendChild(nodeGroup);
@@ -347,11 +362,15 @@ export class ComponentTreeView {
     return nodes;
   }
 
-  private calculateLayout(nodes: TreeNodeData[], width: number, height: number): Map<string, { x: number; y: number }> {
+  private calculateLayout(
+    nodes: TreeNodeData[],
+    width: number,
+    height: number
+  ): Map<string, { x: number; y: number }> {
     const layout = new Map<string, { x: number; y: number }>();
     const levels = new Map<number, TreeNodeData[]>();
     const nodeMap = new Map<string, TreeNodeData>();
-    nodes.forEach(n => nodeMap.set(n.id, n));
+    nodes.forEach((n) => nodeMap.set(n.id, n));
 
     for (const node of nodes) {
       const level = this.getLevel(node, nodeMap);
@@ -367,7 +386,7 @@ export class ComponentTreeView {
       levelNodes.forEach((node, index) => {
         layout.set(node.id, {
           x: nodeWidth * (index + 1),
-          y: levelHeight * (level + 1)
+          y: levelHeight * (level + 1),
         });
       });
     }
@@ -403,7 +422,10 @@ export class ComponentTreeView {
     rect.setAttribute('height', '44');
     rect.setAttribute('rx', '10');
     rect.setAttribute('fill', `url(#${gradientId})`);
-    rect.setAttribute('filter', this.selectedNodeId === node.id ? 'url(#nodeGlow)' : 'url(#nodeShadow)');
+    rect.setAttribute(
+      'filter',
+      this.selectedNodeId === node.id ? 'url(#nodeGlow)' : 'url(#nodeShadow)'
+    );
     rect.setAttribute('class', 'node-rect');
     group.appendChild(rect);
 
@@ -501,13 +523,13 @@ export class ComponentTreeView {
       if ((e.target as SVGElement).tagName === 'circle') return;
       this.selectedNodeId = node.id;
       this.showNodeDetails(node);
-      this.renderTree({ root: this.lastRoot });
+      this.renderTree({ root: this.lastRoot || [], relationships: [] });
     });
 
     return group;
   }
 
-  private lastRoot: any = null;
+  private lastRoot: TreeNodeData[] | null = null;
 
   private toggleCollapse(nodeId: string) {
     if (this.collapsedNodes.has(nodeId)) {
@@ -548,27 +570,39 @@ export class ComponentTreeView {
             <span class="detail-label">${escapeHtml(t('components.source', '来源'))}</span>
             <span class="detail-value code">${escapeHtml(node.src)}</span>
           </div>
-          ${hasChildren ? `
+          ${
+            hasChildren
+              ? `
           <div class="detail-row">
             <span class="detail-icon">🔗</span>
             <span class="detail-label">${escapeHtml(t('components.children', '子组件'))}</span>
             <span class="detail-value">${childrenCount}</span>
           </div>
-          ` : ''}
+          `
+              : ''
+          }
         </div>
-        ${hasChildren ? `
+        ${
+          hasChildren
+            ? `
         <div class="children-preview">
           <h4 class="children-title">${escapeHtml(t('components.children', '子组件'))}</h4>
           <ul class="children-list">
-            ${node.children.map(c => `
+            ${node.children
+              .map(
+                (c) => `
               <li class="child-item" data-child-id="${escapeHtml(c.id)}">
                 <span class="child-type-dot type-${escapeHtml(c.type)}"></span>
                 <span class="child-name">${escapeHtml(c.name)}</span>
               </li>
-            `).join('')}
+            `
+              )
+              .join('')}
           </ul>
         </div>
-        ` : ''}
+        `
+            : ''
+        }
         <div class="node-actions">
           <button class="elegant-btn elegant-btn-secondary" data-action="copy-id">${escapeHtml(t('common.copy', '复制 ID'))}</button>
           <button class="elegant-btn elegant-btn-secondary" data-action="copy-src">${escapeHtml(t('common.copy', '复制路径'))}</button>
@@ -577,7 +611,7 @@ export class ComponentTreeView {
     `;
 
     // 子项点击事件
-    details.querySelectorAll('.child-item').forEach(el => {
+    details.querySelectorAll('.child-item').forEach((el) => {
       el.addEventListener('click', () => {
         const childId = (el as HTMLElement).dataset.childId;
         if (childId) {

@@ -3,7 +3,14 @@
  * 接收后端通过 WebSocket 推送的操作序列并执行
  */
 
-import type { Operation, OperationSequence, OperationResult, OperationType, Settings } from '@ordpaw/shared';
+import type {
+  Operation,
+  OperationSequence,
+  OperationResult,
+  OperationType,
+  Settings,
+  ThemeId,
+} from '@ordpaw/shared';
 import { animationManager } from './animation-manager';
 import { logger } from './logger';
 
@@ -20,7 +27,10 @@ export class SequenceExecutor {
   private executionStates = new Map<string, ExecutionState>();
   private actionHandlers: Map<OperationType, (params: Record<string, unknown>) => Promise<unknown>>;
   private router: { navigate: (route: string) => void };
-  private store: { getSettings: () => Settings; setSettings: (settings: Partial<Settings>) => void };
+  private store: {
+    getSettings: () => Settings;
+    setSettings: (settings: Partial<Settings>) => void;
+  };
 
   constructor(
     router: { navigate: (route: string) => void },
@@ -66,7 +76,10 @@ export class SequenceExecutor {
   }
 
   /** 处理序列开始 */
-  private handleSequenceStart(payload: { sequence: OperationSequence; estimatedDuration?: number }) {
+  private handleSequenceStart(payload: {
+    sequence: OperationSequence;
+    estimatedDuration?: number;
+  }) {
     const { sequence } = payload;
 
     logger.info(`[SequenceExecutor] 开始执行序列: ${sequence.id}`);
@@ -97,7 +110,9 @@ export class SequenceExecutor {
       return;
     }
 
-    logger.info(`[SequenceExecutor] 执行操作 ${operationIndex + 1}/${totalOperations}: ${operation.type}`);
+    logger.info(
+      `[SequenceExecutor] 执行操作 ${operationIndex + 1}/${totalOperations}: ${operation.type}`
+    );
 
     try {
       const startTime = performance.now();
@@ -122,7 +137,14 @@ export class SequenceExecutor {
     } catch (error) {
       logger.error(error, `[SequenceExecutor] 操作执行失败: ${operation.id}`);
 
-      this.sendOperationResult(sequenceId, operation.id, 'failed', 0, undefined, (error as Error).message);
+      this.sendOperationResult(
+        sequenceId,
+        operation.id,
+        'failed',
+        0,
+        undefined,
+        (error as Error).message
+      );
 
       state.results.set(operation.id, {
         operationId: operation.id,
@@ -164,53 +186,63 @@ export class SequenceExecutor {
 
     return Promise.race([
       handler(operation.params),
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('操作超时')), timeout)
-      ),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('操作超时')), timeout)),
     ]);
   }
 
   /** 初始化操作处理器 */
-  private initActionHandlers(): Map<OperationType, (params: Record<string, unknown>) => Promise<unknown>> {
-    const handlers = new Map<OperationType, (params: Record<string, unknown>) => Promise<unknown>>();
+  private initActionHandlers(): Map<
+    OperationType,
+    (params: Record<string, unknown>) => Promise<unknown>
+  > {
+    const handlers = new Map<
+      OperationType,
+      (params: Record<string, unknown>) => Promise<unknown>
+    >();
     const addHandler = <T>(type: OperationType, fn: (params: T) => Promise<unknown>) => {
-      addHandler(type, (params: Record<string, unknown>) => fn(params as T));
+      handlers.set(type, (params: Record<string, unknown>) => fn(params as T));
     };
 
     // UI 点击
-    addHandler('ui:click', async (params: { selector: string; waitFor?: number; simulateHover?: boolean }) => {
-      const element = await this.waitForElement(params.selector, params.waitFor);
-      if (!element) throw new Error(`未找到元素: ${params.selector}`);
+    addHandler(
+      'ui:click',
+      async (params: { selector: string; waitFor?: number; simulateHover?: boolean }) => {
+        const element = await this.waitForElement(params.selector, params.waitFor);
+        if (!element) throw new Error(`未找到元素: ${params.selector}`);
 
-      if (params.simulateHover) {
-        element.classList.add('hover-simulation');
-        await this.sleep(300);
-        element.classList.remove('hover-simulation');
+        if (params.simulateHover) {
+          element.classList.add('hover-simulation');
+          await this.sleep(300);
+          element.classList.remove('hover-simulation');
+        }
+
+        (element as HTMLElement).click();
+        return { clicked: true };
       }
-
-      (element as HTMLElement).click();
-      return { clicked: true };
-    });
+    );
 
     // 路由导航
-    addHandler('ui:navigate', async (params: { route: string; transition?: 'fade' | 'slide' | 'none' }) => {
-      this.router.navigate(params.route);
-      if (params.transition && params.transition !== 'none') {
-        const app = document.getElementById('app');
-        if (app) {
-          app.classList.add(`transition-${params.transition}`);
-          await this.sleep(300);
-          app.classList.remove(`transition-${params.transition}`);
+    addHandler(
+      'ui:navigate',
+      async (params: { route: string; transition?: 'fade' | 'slide' | 'none' }) => {
+        this.router.navigate(params.route);
+        if (params.transition && params.transition !== 'none') {
+          const app = document.getElementById('app');
+          if (app) {
+            app.classList.add(`transition-${params.transition}`);
+            await this.sleep(300);
+            app.classList.remove(`transition-${params.transition}`);
+          }
         }
+        return { navigated: params.route };
       }
-      return { navigated: params.route };
-    });
+    );
 
     // 主题切换
     addHandler('ui:theme', async (params: { theme: string; animate?: boolean }) => {
       const currentTheme = this.store.getSettings().theme;
       const settings = this.store.getSettings();
-      this.store.setSettings({ ...settings, theme: params.theme });
+      this.store.setSettings({ ...settings, theme: params.theme as ThemeId });
 
       if (params.animate) {
         const app = document.getElementById('app');
@@ -228,171 +260,188 @@ export class SequenceExecutor {
     });
 
     // 输入填充
-    addHandler('ui:input', async (params: {
-      selector: string;
-      value: string;
-      clearFirst?: boolean;
-      simulateTyping?: boolean;
-      typingSpeed?: number;
-    }) => {
-      const element = await this.waitForElement(params.selector) as HTMLInputElement;
-      if (!element) throw new Error(`未找到元素: ${params.selector}`);
+    addHandler(
+      'ui:input',
+      async (params: {
+        selector: string;
+        value: string;
+        clearFirst?: boolean;
+        simulateTyping?: boolean;
+        typingSpeed?: number;
+      }) => {
+        const element = (await this.waitForElement(params.selector)) as HTMLInputElement;
+        if (!element) throw new Error(`未找到元素: ${params.selector}`);
 
-      if (params.clearFirst) {
-        element.value = '';
-      }
-
-      if (params.simulateTyping) {
-        const speed = params.typingSpeed || 50;
-        for (const char of params.value) {
-          element.value += char;
-          element.dispatchEvent(new Event('input', { bubbles: true }));
-          await this.sleep(speed);
+        if (params.clearFirst) {
+          element.value = '';
         }
-      } else {
-        element.value = params.value;
-        element.dispatchEvent(new Event('input', { bubbles: true }));
-      }
 
-      return { input: params.value };
-    });
+        if (params.simulateTyping) {
+          const speed = params.typingSpeed || 50;
+          for (const char of params.value) {
+            element.value += char;
+            element.dispatchEvent(new Event('input', { bubbles: true }));
+            await this.sleep(speed);
+          }
+        } else {
+          element.value = params.value;
+          element.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+
+        return { input: params.value };
+      }
+    );
 
     // 滚动
-    addHandler('ui:scroll', async (params: {
-      selector?: string;
-      position: 'top' | 'bottom' | number;
-      smooth?: boolean;
-    }) => {
-      const target = params.selector
-        ? document.querySelector(params.selector)
-        : window;
+    addHandler(
+      'ui:scroll',
+      async (params: {
+        selector?: string;
+        position: 'top' | 'bottom' | number;
+        smooth?: boolean;
+      }) => {
+        const target = params.selector ? document.querySelector(params.selector) : window;
 
-      const position = params.position === 'top' ? 0
-        : params.position === 'bottom' ? document.body.scrollHeight
-        : params.position;
+        const position =
+          params.position === 'top'
+            ? 0
+            : params.position === 'bottom'
+              ? document.body.scrollHeight
+              : params.position;
 
-      if (target === window) {
-        window.scrollTo({
-          top: position,
-          behavior: params.smooth ? 'smooth' : 'auto',
-        });
-      } else {
-        (target as HTMLElement).scrollTop = position;
+        if (target === window) {
+          window.scrollTo({
+            top: position,
+            behavior: params.smooth ? 'smooth' : 'auto',
+          });
+        } else {
+          (target as HTMLElement).scrollTop = position;
+        }
+
+        return { scrolled: position };
       }
-
-      return { scrolled: position };
-    });
+    );
 
     // 高亮显示
-    addHandler('ui:highlight', async (params: {
-      selector: string;
-      duration?: number;
-      style?: 'pulse' | 'glow' | 'border';
-      color?: string;
-    }) => {
-      const element = await this.waitForElement(params.selector) as HTMLElement;
-      if (!element) throw new Error(`未找到元素: ${params.selector}`);
+    addHandler(
+      'ui:highlight',
+      async (params: {
+        selector: string;
+        duration?: number;
+        style?: 'pulse' | 'glow' | 'border';
+        color?: string;
+      }) => {
+        const element = (await this.waitForElement(params.selector)) as HTMLElement;
+        if (!element) throw new Error(`未找到元素: ${params.selector}`);
 
-      const duration = params.duration || 2000;
-      const className = `highlight-${params.style || 'pulse'}`;
+        const duration = params.duration || 2000;
+        const className = `highlight-${params.style || 'pulse'}`;
 
-      element.classList.add(className);
-      if (params.color) {
-        element.style.setProperty('--highlight-color', params.color);
+        element.classList.add(className);
+        if (params.color) {
+          element.style.setProperty('--highlight-color', params.color);
+        }
+
+        await this.sleep(duration);
+        element.classList.remove(className);
+
+        return { highlighted: params.selector };
       }
-
-      await this.sleep(duration);
-      element.classList.remove(className);
-
-      return { highlighted: params.selector };
-    });
+    );
 
     // 发送聊天消息
-    addHandler('chat:send', async (params: {
-      conversationId: string;
-      content: string;
-      waitForResponse?: boolean;
-    }) => {
-      if (!this.ws) throw new Error('WebSocket 未连接');
+    addHandler(
+      'chat:send',
+      async (params: { conversationId: string; content: string; waitForResponse?: boolean }) => {
+        if (!this.ws) throw new Error('WebSocket 未连接');
 
-      this.ws.send(JSON.stringify({
-        type: 'chat:message',
-        payload: {
-          conversationId: params.conversationId,
-          content: params.content,
-        },
-      }));
+        this.ws.send(
+          JSON.stringify({
+            type: 'chat:message',
+            payload: {
+              conversationId: params.conversationId,
+              content: params.content,
+            },
+          })
+        );
 
-      if (params.waitForResponse) {
-        await this.sleep(1000);
+        if (params.waitForResponse) {
+          await this.sleep(1000);
+        }
+
+        return { sent: true };
       }
-
-      return { sent: true };
-    });
+    );
 
     // 播放动画
-    addHandler('animation:play', async (params: {
-      animation: 'fadeIn' | 'fadeOut' | 'slideIn';
-      target?: string;
-      duration?: number;
-    }) => {
-      const target = params.target
-        ? document.querySelector(params.target) as HTMLElement
-        : document.getElementById('app');
+    addHandler(
+      'animation:play',
+      async (params: {
+        animation: 'fadeIn' | 'fadeOut' | 'slideIn';
+        target?: string;
+        duration?: number;
+      }) => {
+        const target = params.target
+          ? (document.querySelector(params.target) as HTMLElement)
+          : document.getElementById('app');
 
-      if (!target) throw new Error(`未找到目标: ${params.target}`);
+        if (!target) throw new Error(`未找到目标: ${params.target}`);
 
-      const duration = params.duration || 300;
+        const duration = params.duration || 300;
 
-      switch (params.animation) {
-        case 'fadeIn':
-          await animationManager.fadeIn(target, duration);
-          break;
-        case 'fadeOut':
-          await animationManager.fadeOut(target, duration);
-          break;
-        case 'slideIn':
-          await animationManager.slideIn(target, 'up', duration);
-          break;
+        switch (params.animation) {
+          case 'fadeIn':
+            await animationManager.fadeIn(target, duration);
+            break;
+          case 'fadeOut':
+            await animationManager.fadeOut(target, duration);
+            break;
+          case 'slideIn':
+            await animationManager.slideIn(target, 'up', duration);
+            break;
+        }
+
+        return { played: params.animation };
       }
-
-      return { played: params.animation };
-    });
+    );
 
     // 显示通知
-    addHandler('notification:show', async (params: {
-      type: 'info' | 'success' | 'warning' | 'error';
-      title: string;
-      message: string;
-      duration?: number;
-      dismissible?: boolean;
-    }) => {
-      const notification = document.createElement('div');
-      notification.className = `notification notification-${params.type}`;
-      notification.innerHTML = `
+    addHandler(
+      'notification:show',
+      async (params: {
+        type: 'info' | 'success' | 'warning' | 'error';
+        title: string;
+        message: string;
+        duration?: number;
+        dismissible?: boolean;
+      }) => {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${params.type}`;
+        notification.innerHTML = `
         <div class="notification-title">${params.title}</div>
         <div class="notification-message">${params.message}</div>
       `;
 
-      if (params.dismissible) {
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'notification-close';
-        closeBtn.innerHTML = '×';
-        closeBtn.onclick = () => notification.remove();
-        notification.appendChild(closeBtn);
+        if (params.dismissible) {
+          const closeBtn = document.createElement('button');
+          closeBtn.className = 'notification-close';
+          closeBtn.innerHTML = '×';
+          closeBtn.onclick = () => notification.remove();
+          notification.appendChild(closeBtn);
+        }
+
+        document.body.appendChild(notification);
+        await animationManager.fadeIn(notification, 300);
+
+        if (params.duration) {
+          await this.sleep(params.duration);
+          await animationManager.fadeOut(notification, 300);
+          notification.remove();
+        }
+
+        return { shown: true };
       }
-
-      document.body.appendChild(notification);
-      await animationManager.fadeIn(notification, 300);
-
-      if (params.duration) {
-        await this.sleep(params.duration);
-        await animationManager.fadeOut(notification, 300);
-        notification.remove();
-      }
-
-      return { shown: true };
-    });
+    );
 
     return handlers;
   }
@@ -421,44 +470,43 @@ export class SequenceExecutor {
   ) {
     if (!this.ws) return;
 
-    this.ws.send(JSON.stringify({
-      type: 'operation:result',
-      payload: {
-        operationId,
+    this.ws.send(
+      JSON.stringify({
+        type: 'operation:result',
+        payload: {
+          operationId,
+          sequenceId,
+          status,
+          duration,
+          result,
+          error,
+        },
         sequenceId,
-        status,
-        duration,
-        result,
-        error,
-      },
-      sequenceId,
-      operationId,
-      timestamp: Date.now(),
-    }));
+        operationId,
+        timestamp: Date.now(),
+      })
+    );
   }
 
   /** 发送进度 */
-  private sendProgress(
-    sequenceId: string,
-    current: number,
-    total: number,
-    status: string
-  ) {
+  private sendProgress(sequenceId: string, current: number, total: number, status: string) {
     if (!this.ws) return;
 
     const state = this.executionStates.get(sequenceId);
-    this.ws.send(JSON.stringify({
-      type: 'sequence:progress',
-      payload: {
+    this.ws.send(
+      JSON.stringify({
+        type: 'sequence:progress',
+        payload: {
+          sequenceId,
+          current,
+          total,
+          currentOperationId: state?.operations[current]?.id,
+          status,
+        },
         sequenceId,
-        current,
-        total,
-        currentOperationId: state?.operations[current]?.id,
-        status,
-      },
-      sequenceId,
-      timestamp: Date.now(),
-    }));
+        timestamp: Date.now(),
+      })
+    );
   }
 
   /** 处理序列完成 */
@@ -479,6 +527,6 @@ export class SequenceExecutor {
 
   /** 休眠 */
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }

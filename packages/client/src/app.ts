@@ -89,7 +89,7 @@ export class App {
 
     // Install the public window.OrdPaw plugin API before loading plugin
     // components so contributed scripts can immediately register themselves.
-    installGlobalPluginApi(() => this.store.getSettings());
+    installGlobalPluginApi(() => this.store.getSettings() as unknown as Record<string, unknown>);
     loadPluginComponents();
 
     app.appendChild(this.sidebar.render());
@@ -133,9 +133,8 @@ export class App {
     try {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const wsHost = window.location.hostname;
-      const wsPort = window.location.port && window.location.port !== '5173'
-        ? window.location.port
-        : '3000';
+      const wsPort =
+        window.location.port && window.location.port !== '5173' ? window.location.port : '3000';
       const wsUrl = `${wsProtocol}//${wsHost}:${wsPort}`;
 
       this.ws = new WebSocket(wsUrl);
@@ -272,7 +271,10 @@ export class App {
     if (newMode !== this.lastAppliedMode) {
       this.lastAppliedMode = newMode;
       this.transitionUIMode();
-    } else if (newEffects !== this.lastAppliedEffects || newPerformance !== this.lastAppliedPerformance) {
+    } else if (
+      newEffects !== this.lastAppliedEffects ||
+      newPerformance !== this.lastAppliedPerformance
+    ) {
       this.lastAppliedEffects = newEffects;
       this.lastAppliedPerformance = newPerformance;
     }
@@ -320,67 +322,69 @@ export class App {
       '#/': {
         title: t('nav.dashboard'),
         crumbs: 'OrdPaw · Dashboard',
-        view: () => new Dashboard(this.api, this.store, () => this.loadStats()).render()
+        view: () => new Dashboard(this.api, this.store, () => this.loadStats()).render(),
       },
       '#/conversations': {
         title: t('conversation.title'),
         crumbs: 'OrdPaw · Conversations',
-        view: () => new ConversationsView(this.api, this.store).render()
+        view: () => new ConversationsView(this.api, this.store).render(),
       },
       '#/agents': {
         title: t('agent.title'),
         crumbs: 'OrdPaw · Agents',
-        view: () => new AgentsView(this.api, this.store, () => this.loadStats()).render()
+        view: () => new AgentsView(this.api, this.store, () => this.loadStats()).render(),
       },
       '#/plugins': {
         title: t('plugin.title'),
         crumbs: 'OrdPaw · Plugins',
-        view: () => new PluginsView(this.api, this.store).render()
+        view: () => new PluginsView(this.api, this.store).render(),
       },
       '#/prompts': {
         title: t('prompt.title'),
         crumbs: 'OrdPaw · Prompts',
-        view: () => new PromptsView(this.api, this.store).render()
+        view: () => new PromptsView(this.api, this.store).render(),
       },
       '#/scripts': {
         title: t('script.title'),
         crumbs: 'OrdPaw · Scripts',
-        view: () => new ScriptsView(this.api).render()
+        view: () => new ScriptsView(this.api).render(),
       },
       '#/providers': {
         title: t('provider.title'),
         crumbs: 'OrdPaw · Providers',
-        view: () => new ProvidersView(this.api).render()
+        view: () => new ProvidersView(this.api).render(),
       },
       '#/tests': {
         title: t('test.title'),
         crumbs: 'OrdPaw · Tests',
-        view: () => new TestsView(this.api).render()
+        view: () => new TestsView(this.api).render(),
       },
       '#/debug': {
         title: t('debug.title'),
         crumbs: 'OrdPaw · Debug',
-        view: () => new DebugView(this.api, this.store).render()
+        view: () => new DebugView(this.api, this.store).render(),
       },
       '#/settings': {
         title: t('settings.title'),
         crumbs: 'OrdPaw · Settings',
-        view: () => new SettingsView(this.api, this.store, () => this.onSettingsChange()).render()
+        view: () => new SettingsView(this.api, this.store, () => this.onSettingsChange()).render(),
       },
       '#/download': {
         title: t('download.title'),
         crumbs: 'OrdPaw · Downloads',
-        view: () => new DownloadManagerView(this.api, this.store, this.downloadManager).render()
+        view: () => new DownloadManagerView(this.api, this.store, this.downloadManager).render(),
       },
       '#/mcp-skills': {
         title: t('nav.mcpSkills'),
         crumbs: 'OrdPaw · MCP & Skills',
-        view: () => new McpSkillsView(this.api).init(document.getElementById('view-content')!)
-      }
+        view: () => new McpSkillsView(this.api).init(document.getElementById('view-content')!),
+      },
     };
     const meta = routeMap[this.currentRoute];
     if (meta) {
-      this.renderView(meta.view, meta.title, meta.crumbs).catch(err => logger.error(err, '视图渲染失败'));
+      this.renderView(meta.view, meta.title, meta.crumbs).catch((err) =>
+        logger.error(err, '视图渲染失败')
+      );
     }
   }
 
@@ -397,7 +401,7 @@ export class App {
       '#/debug': { title: t('debug.title'), crumbs: 'OrdPaw · Debug' },
       '#/settings': { title: t('settings.title'), crumbs: 'OrdPaw · Settings' },
       '#/download': { title: t('download.title'), crumbs: 'OrdPaw · Downloads' },
-      '#/mcp-skills': { title: t('nav.mcpSkills'), crumbs: 'OrdPaw · MCP & Skills' }
+      '#/mcp-skills': { title: t('nav.mcpSkills'), crumbs: 'OrdPaw · MCP & Skills' },
     };
     const meta = routeMap[this.currentRoute];
     if (meta) {
@@ -411,68 +415,68 @@ export class App {
       '#/': {
         title: t('nav.dashboard'),
         crumbs: 'OrdPaw · Dashboard',
-        view: () => new Dashboard(this.api, this.store, () => this.loadStats()).render()
+        view: () => new Dashboard(this.api, this.store, () => this.loadStats()).render(),
       },
       '#/conversations': {
         title: t('conversation.title'),
         crumbs: 'OrdPaw · Conversations',
-        view: () => new ConversationsView(this.api, this.store).render()
+        view: () => new ConversationsView(this.api, this.store).render(),
       },
       '#/agents': {
         title: t('agent.title'),
         crumbs: 'OrdPaw · Agents',
-        view: () => new AgentsView(this.api, this.store, () => this.loadStats()).render()
+        view: () => new AgentsView(this.api, this.store, () => this.loadStats()).render(),
       },
       '#/plugins': {
         title: t('plugin.title'),
         crumbs: 'OrdPaw · Plugins',
-        view: () => new PluginsView(this.api, this.store).render()
+        view: () => new PluginsView(this.api, this.store).render(),
       },
       '#/prompts': {
         title: t('prompt.title'),
         crumbs: 'OrdPaw · Prompts',
-        view: () => new PromptsView(this.api, this.store).render()
+        view: () => new PromptsView(this.api, this.store).render(),
       },
       '#/scripts': {
         title: t('script.title'),
         crumbs: 'OrdPaw · Scripts',
-        view: () => new ScriptsView(this.api).render()
+        view: () => new ScriptsView(this.api).render(),
       },
       '#/providers': {
         title: t('provider.title'),
         crumbs: 'OrdPaw · Providers',
-        view: () => new ProvidersView(this.api).render()
+        view: () => new ProvidersView(this.api).render(),
       },
       '#/tests': {
         title: t('test.title'),
         crumbs: 'OrdPaw · Tests',
-        view: () => new TestsView(this.api).render()
+        view: () => new TestsView(this.api).render(),
       },
       '#/debug': {
         title: t('debug.title'),
         crumbs: 'OrdPaw · Debug',
-        view: () => new DebugView(this.api, this.store).render()
+        view: () => new DebugView(this.api, this.store).render(),
       },
       '#/settings': {
         title: t('settings.title'),
         crumbs: 'OrdPaw · Settings',
-        view: () => new SettingsView(this.api, this.store, () => this.onSettingsChange()).render()
+        view: () => new SettingsView(this.api, this.store, () => this.onSettingsChange()).render(),
       },
       '#/download': {
         title: t('download.title'),
         crumbs: 'OrdPaw · Downloads',
-        view: () => new DownloadManagerView(this.api, this.store, this.downloadManager).render()
+        view: () => new DownloadManagerView(this.api, this.store, this.downloadManager).render(),
       },
       '#/mcp-skills': {
         title: t('nav.mcpSkills'),
         crumbs: 'OrdPaw · MCP & Skills',
-        view: () => new McpSkillsView(this.api).init(document.getElementById('view-content')!)
+        view: () => new McpSkillsView(this.api).init(document.getElementById('view-content')!),
       },
       '#/components': {
         title: t('components.title', '组件树'),
         crumbs: 'OrdPaw · Components',
-        view: () => new ComponentTreeView(this.api).render()
-      }
+        view: () => new ComponentTreeView(this.api).render(),
+      },
     };
 
     for (const [route, meta] of Object.entries(routeMap)) {

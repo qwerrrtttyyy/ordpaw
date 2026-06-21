@@ -1,6 +1,6 @@
 import express from 'express';
 import cors from 'cors';
-import { createServer, type Server } from 'http';
+import { createServer } from 'http';
 import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -12,20 +12,13 @@ import { loadPlugins } from './plugin/loader.js';
 import { scriptMcp } from './core/script-mcp.js';
 import { providerService } from './core/provider-service.js';
 import { componentServer } from './core/component-server.js';
-import { debugLogger } from './core/debug-logger.js';
 import { skillRunner } from './core/skill-runner.js';
 import { mcpClient } from './core/mcp-client.js';
 import { logger } from './core/logger.js';
-import {
-  errorHandler,
-  requestLogger,
-  notFoundHandler
-} from './middleware.js';
+import { errorHandler, requestLogger, notFoundHandler } from './middleware.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-let server: Server | null = null;
 
 async function start() {
   try {
@@ -49,14 +42,16 @@ async function start() {
 
     // 静态文件服务（前端）
     const clientDistPath = join(__dirname, '../../client/dist');
-    app.use(express.static(clientDistPath, {
-      index: false,
-      setHeaders: (res, path) => {
-        if (path.endsWith('.html')) {
-          res.setHeader('Cache-Control', 'no-cache');
-        }
-      }
-    }));
+    app.use(
+      express.static(clientDistPath, {
+        index: false,
+        setHeaders: (res, path) => {
+          if (path.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+          }
+        },
+      })
+    );
 
     // 健康检查（无需鉴权）
     app.get('/healthz', (_req, res) => {
@@ -73,7 +68,7 @@ async function start() {
     setupWebSocket(wss);
 
     // 加载插件（异步，不阻塞启动）
-    loadPlugins().catch(err => {
+    loadPlugins().catch((err) => {
       logger.error(err, '✗ 插件加载失败:');
     });
 
@@ -102,8 +97,6 @@ async function start() {
       logger.info(`🔌 WebSocket: ws://localhost:${PORT}`);
       logger.info(`💚 Health: http://localhost:${PORT}/healthz`);
     });
-
-    server = httpServer;
 
     // 优雅关闭
     setupGracefulShutdown(httpServer, wss);

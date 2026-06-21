@@ -22,7 +22,9 @@ const injectedLinks = new Map<string, HTMLLinkElement>();
 const componentRegistry = new Map<string, ComponentInstance>();
 const lifecycleHooks = new Map<string, { mount?: LifecycleHook; unmount?: LifecycleHook }>();
 
-export async function loadPluginComponents(baseUrl = '/api/components/manifest'): Promise<ComponentContribution[]> {
+export async function loadPluginComponents(
+  baseUrl = '/api/components/manifest'
+): Promise<ComponentContribution[]> {
   try {
     const res = await fetch(baseUrl);
     if (!res.ok) return [];
@@ -35,16 +37,17 @@ export async function loadPluginComponents(baseUrl = '/api/components/manifest')
       } else if (c.type === 'script' || c.type === 'component') {
         await injectScript(c.src);
       }
-      const id = `${c.metadata?.__plugin}:${c.name}`;
+      const pluginName = String(c.metadata?.__plugin || 'unknown');
+      const id = `${pluginName}:${c.name}`;
       const instance: ComponentInstance = {
         id,
         name: c.name,
         type: c.type,
         src: c.src,
-        plugin: c.metadata?.__plugin || 'unknown',
+        plugin: pluginName,
         metadata: c.metadata || {},
         mountedElements: new WeakSet(),
-        loaded: true
+        loaded: true,
       };
       const hooks = lifecycleHooks.get(id);
       if (hooks) {
@@ -89,7 +92,9 @@ export function getComponentsByPlugin(pluginName: string): ComponentInstance[] {
   return result;
 }
 
-export async function reloadPluginComponents(baseUrl = '/api/components/manifest'): Promise<ComponentContribution[]> {
+export async function reloadPluginComponents(
+  baseUrl = '/api/components/manifest'
+): Promise<ComponentContribution[]> {
   for (const [, el] of injectedScripts) el.remove();
   for (const [, el] of injectedLinks) el.remove();
   injectedScripts.clear();
@@ -159,7 +164,8 @@ export async function unmountComponent(id: string, el: HTMLElement): Promise<voi
  * 会自动绑定先前通过 registerLifecycle 注册的钩子。
  */
 export function registerRuntimeComponent(contribution: ComponentContribution): void {
-  const id = `${contribution.metadata?.__plugin || 'runtime'}:${contribution.name}`;
+  const pluginName = String(contribution.metadata?.__plugin || 'runtime');
+  const id = `${pluginName}:${contribution.name}`;
   const existing = componentRegistry.get(id);
   if (existing) {
     logger.warn(`[ComponentLoader] 组件 ${id} 已存在，将被覆盖`);
@@ -171,12 +177,12 @@ export function registerRuntimeComponent(contribution: ComponentContribution): v
     name: contribution.name,
     type: contribution.type,
     src: contribution.src,
-    plugin: contribution.metadata?.__plugin || 'runtime',
+    plugin: pluginName,
     metadata: contribution.metadata || {},
     mountedElements: new WeakSet(),
     loaded: true,
     mount: existing?.mount ?? hooks?.mount,
-    unmount: existing?.unmount ?? hooks?.unmount
+    unmount: existing?.unmount ?? hooks?.unmount,
   };
   if (contribution.type === 'css') {
     injectCss(contribution.src);

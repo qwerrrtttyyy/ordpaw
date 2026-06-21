@@ -1,13 +1,23 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as utils from '../utils';
 
-const { detectOS, applyOSEffects, getOSAnimationDuration, debounce, throttle, transitionTheme, showToast, createModal, prefersReducedMotion } = utils;
+const {
+  detectOS,
+  applyOSEffects,
+  getOSAnimationDuration,
+  debounce,
+  throttle,
+  transitionTheme,
+  showToast,
+  createModal,
+  prefersReducedMotion,
+} = utils;
 
 describe('OS Detection', () => {
   it('should detect macOS', () => {
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)',
-      configurable: true
+      configurable: true,
     });
     expect(detectOS()).toBe('macos');
   });
@@ -15,7 +25,7 @@ describe('OS Detection', () => {
   it('should detect Windows', () => {
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
-      configurable: true
+      configurable: true,
     });
     expect(detectOS()).toBe('windows');
   });
@@ -23,7 +33,7 @@ describe('OS Detection', () => {
   it('should detect Linux', () => {
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (X11; Linux x86_64)',
-      configurable: true
+      configurable: true,
     });
     expect(detectOS()).toBe('linux');
   });
@@ -31,7 +41,7 @@ describe('OS Detection', () => {
   it('should return unknown for unrecognized UA', () => {
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Some Custom Browser/1.0',
-      configurable: true
+      configurable: true,
     });
     expect(detectOS()).toBe('unknown');
   });
@@ -86,7 +96,9 @@ describe('getOSAnimationDuration', () => {
 describe('escapeHtml', () => {
   it('should escape HTML special characters', async () => {
     const { escapeHtml } = await import('../utils');
-    expect(escapeHtml('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert("xss")&lt;/script&gt;');
+    expect(escapeHtml('<script>alert("xss")</script>')).toBe(
+      '&lt;script&gt;alert("xss")&lt;/script&gt;'
+    );
   });
 
   it('should handle null and undefined', async () => {
@@ -138,8 +150,12 @@ describe('formatRelativeTime', () => {
 });
 
 describe('debounce', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('should delay function execution', () => {
     const fn = vi.fn();
@@ -171,8 +187,12 @@ describe('debounce', () => {
 });
 
 describe('throttle', () => {
-  beforeEach(() => { vi.useFakeTimers(); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('should execute immediately', () => {
     const fn = vi.fn();
@@ -222,11 +242,11 @@ describe('detectOS extended', () => {
   it('detects iOS', () => {
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
-      configurable: true
+      configurable: true,
     });
     Object.defineProperty(navigator, 'platform', {
       value: 'iPhone',
-      configurable: true
+      configurable: true,
     });
     expect(detectOS()).toBe('ios');
   });
@@ -234,11 +254,11 @@ describe('detectOS extended', () => {
   it('detects Android', () => {
     Object.defineProperty(navigator, 'userAgent', {
       value: 'Mozilla/5.0 (Linux; Android 10)',
-      configurable: true
+      configurable: true,
     });
     Object.defineProperty(navigator, 'platform', {
       value: 'Linux armv8l',
-      configurable: true
+      configurable: true,
     });
     expect(detectOS()).toBe('android');
   });
@@ -286,12 +306,12 @@ describe('createModal', () => {
     const { overlay, close } = createModal({
       title: 'Test',
       bodyHtml: '<p>body</p>',
-      onSubmit
+      onSubmit,
     });
     expect(document.querySelector('.modal-overlay')).toBe(overlay);
     const confirmBtn = overlay.querySelector('[data-action="confirm"]') as HTMLElement;
     confirmBtn.click();
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise((r) => setTimeout(r, 10));
     expect(onSubmit).toHaveBeenCalled();
     close();
     expect(document.querySelector('.modal-overlay')).toBeNull();
@@ -308,7 +328,7 @@ describe('createModal', () => {
 describe('prefersReducedMotion', () => {
   it('returns false when window undefined', () => {
     const originalWindow = global.window;
-    // @ts-expect-error
+    // @ts-expect-error testing undefined window environment
     global.window = undefined;
     expect(prefersReducedMotion()).toBe(false);
     global.window = originalWindow;

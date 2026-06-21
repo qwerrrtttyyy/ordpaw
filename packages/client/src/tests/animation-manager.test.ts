@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AnimationManager, initAnimationPreferences, detectPerformanceTier, prefersReducedMotion } from '../animation-manager';
+import {
+  AnimationManager,
+  initAnimationPreferences,
+  detectPerformanceTier,
+  prefersReducedMotion,
+} from '../animation-manager';
 
 describe('AnimationManager', () => {
   let manager: AnimationManager;
@@ -95,7 +100,7 @@ describe('AnimationManager', () => {
 describe('detectPerformanceTier', () => {
   it('returns high when window is undefined', () => {
     const originalWindow = global.window;
-    // @ts-expect-error
+    // @ts-expect-error testing undefined window environment
     global.window = undefined;
     expect(detectPerformanceTier()).toBe('high');
     global.window = originalWindow;
@@ -105,7 +110,7 @@ describe('detectPerformanceTier', () => {
 describe('prefersReducedMotion', () => {
   it('returns false when window is undefined', () => {
     const originalWindow = global.window;
-    // @ts-expect-error
+    // @ts-expect-error testing undefined window environment
     global.window = undefined;
     expect(prefersReducedMotion()).toBe(false);
     global.window = originalWindow;

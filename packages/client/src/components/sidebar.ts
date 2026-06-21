@@ -1,9 +1,10 @@
 import { t } from '../i18n';
+import type { StatsResponse } from '@ordpaw/shared';
 
 export class Sidebar {
   private container: HTMLElement;
   private navigateCallback?: (route: string) => void;
-  private stats: Record<string, number> = {
+  private stats: StatsResponse = {
     agents: 0,
     conversations: 0,
     plugins: 0,
@@ -12,7 +13,8 @@ export class Sidebar {
     providers: 0,
     testSuites: 0,
     mcpServers: 0,
-    installedSkills: 0
+    installedSkills: 0,
+    skills: 0,
   };
 
   constructor() {
@@ -20,7 +22,7 @@ export class Sidebar {
     this.container.className = 'sidebar';
   }
 
-  setStats(stats: Record<string, number>) {
+  setStats(stats: StatsResponse) {
     this.stats = stats;
     this.render();
   }
@@ -115,7 +117,7 @@ export class Sidebar {
       </div>
     `;
 
-    this.container.querySelectorAll('.nav-item').forEach(item => {
+    this.container.querySelectorAll('.nav-item').forEach((item) => {
       item.addEventListener('click', () => {
         const route = item.getAttribute('data-route');
         if (route && this.navigateCallback) {
@@ -132,7 +134,7 @@ export class Sidebar {
   }
 
   setActive(route: string) {
-    this.container.querySelectorAll('.nav-item').forEach(item => {
+    this.container.querySelectorAll('.nav-item').forEach((item) => {
       if (item.getAttribute('data-route') === route) {
         item.classList.add('active');
       } else {

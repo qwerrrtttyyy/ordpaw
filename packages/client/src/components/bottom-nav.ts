@@ -1,11 +1,12 @@
 import { t } from '../i18n';
+import type { StatsResponse } from '@ordpaw/shared';
 
 const ITEMS = [
   { route: '#/', icon: '◇', labelKey: 'nav.dashboard' as const },
   { route: '#/agents', icon: '◉', labelKey: 'nav.agents' as const },
   { route: '#/providers', icon: '⚡', labelKey: 'nav.providers' as const },
   { route: '#/tests', icon: '✓', labelKey: 'nav.tests' as const },
-  { route: '#/download', icon: '↓', labelKey: 'nav.download' as const }
+  { route: '#/download', icon: '↓', labelKey: 'nav.download' as const },
 ];
 
 export class BottomNav {
@@ -21,7 +22,7 @@ export class BottomNav {
     const items = document.createElement('div');
     items.className = 'bottom-nav-items';
 
-    ITEMS.forEach(item => {
+    ITEMS.forEach((item) => {
       const el = document.createElement('div');
       el.className = 'bottom-nav-item';
       el.setAttribute('data-route', item.route);
@@ -45,7 +46,7 @@ export class BottomNav {
   }
 
   setActive(route: string) {
-    this.container.querySelectorAll('.bottom-nav-item').forEach(item => {
+    this.container.querySelectorAll('.bottom-nav-item').forEach((item) => {
       if (item.getAttribute('data-route') === route) {
         item.classList.add('active');
       } else {
@@ -54,10 +55,10 @@ export class BottomNav {
     });
   }
 
-  setCounts(stats: Record<string, number>) {
+  setCounts(stats: StatsResponse) {
     // Show a small badge count next to the agents nav item, since agents is
     // a top-level concept users check frequently on mobile.
-    this.container.querySelectorAll('.bottom-nav-item').forEach(item => {
+    this.container.querySelectorAll('.bottom-nav-item').forEach((item) => {
       const route = item.getAttribute('data-route');
       const badge = item.querySelector('.bottom-nav-badge') as HTMLElement | null;
       let count: number | undefined;

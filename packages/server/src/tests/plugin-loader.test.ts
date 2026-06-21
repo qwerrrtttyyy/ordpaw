@@ -1,5 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import type { ComponentContribution } from '@ordpaw/shared';
+import { existsSync, readdirSync, readFileSync, mkdirSync, rmSync, writeFileSync } from 'fs';
+import { join } from 'path';
 
 const mockDb = { run: vi.fn() };
 const mockGetDatabase = vi.fn(() => mockDb);
@@ -10,6 +12,7 @@ const mockGetConversation = vi.fn();
 const mockRegisterSkill = vi.fn();
 const mockEmit = vi.fn();
 const mockRegisterComponent = vi.fn();
+const mockOn = vi.fn();
 
 vi.mock('../db/index.js', () => ({
   getDatabase: (...args: any[]) => mockGetDatabase(...args),
@@ -34,7 +37,11 @@ vi.mock('../core/skill-runner.js', () => ({
 }));
 
 vi.mock('../core/event-bus.js', () => ({
-  eventBus: { emit: (...args: any[]) => mockEmit(...args), on: vi.fn(), off: vi.fn() },
+  eventBus: {
+    emit: (...args: any[]) => mockEmit(...args),
+    on: (...args: any[]) => mockOn(...args),
+    off: vi.fn(),
+  },
 }));
 
 vi.mock('../core/component-server.js', () => ({
@@ -88,10 +95,12 @@ describe('createPluginApi', () => {
     const api = createPluginApi('test-plugin', '/fake/path');
     api.db.set('k1', { value: 42 });
 
-    expect(mockDb.run).toHaveBeenCalledWith(
-      expect.stringContaining('INSERT INTO plugin_storage'),
-      ['test-plugin', 'k1', JSON.stringify({ value: 42 }), expect.any(Number)]
-    );
+    expect(mockDb.run).toHaveBeenCalledWith(expect.stringContaining('INSERT INTO plugin_storage'), [
+      'test-plugin',
+      'k1',
+      JSON.stringify({ value: 42 }),
+      expect.any(Number),
+    ]);
     expect(mockSaveDatabase).toHaveBeenCalled();
   });
 
@@ -129,16 +138,21 @@ describe('createPluginApi', () => {
     const api = createPluginApi('test-plugin', '/fake/path');
     api.db.clear();
 
-    expect(mockDb.run).toHaveBeenCalledWith(
-      'DELETE FROM plugin_storage WHERE plugin_name = ?',
-      ['test-plugin']
-    );
+    expect(mockDb.run).toHaveBeenCalledWith('DELETE FROM plugin_storage WHERE plugin_name = ?', [
+      'test-plugin',
+    ]);
     expect(mockSaveDatabase).toHaveBeenCalled();
   });
 
   it('registerSkill delegates to skillRunner', async () => {
     const { createPluginApi } = await import('../plugin/loader.js');
-    const skill = { id: 's1', name: 'skill', description: '', parameters: {}, execute: async () => ({}) };
+    const skill = {
+      id: 's1',
+      name: 'skill',
+      description: '',
+      parameters: {},
+      execute: async () => ({}),
+    };
 
     const api = createPluginApi('test-plugin', '/fake/path');
     api.registerSkill(skill);
@@ -163,5 +177,91 @@ describe('createPluginApi', () => {
     api.emit('custom:event', { data: 1 });
 
     expect(mockEmit).toHaveBeenCalledWith('custom:event', { data: 1 });
+  });
+});
+
+describe('loadPlugins', () => {
+  const pluginsDir = join(process.cwd(), 'plugins');
+
+  function resetPluginsDir() {
+    if (existsSync(pluginsDir)) {
+      rmSync(pluginsDir, { recursive: true, force: true });
+    }
+  }
+
+  function createPlugin(name: string, manifest: Record<string, unknown>, code: string) {
+    const pluginDir = join(pluginsDir, name);
+    mkdirSync(pluginDir, { recursive: true });
+    writeFileSync(join(pluginDir, 'plugin.json'), JSON.stringify(manifest));
+    writeFileSync(join(pluginDir, (manifest.main as string) || 'index.js'), code);
+  }
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    resetPluginsDir();
+  });
+
+  afterEach(() => {
+    resetPluginsDir();
+  });
+
+  it('does nothing when plugins directory does not exist', async () => {
+    const { loadPlugins } = await import('../plugin/loader.js');
+    await loadPlugins();
+    expect(mockRegisterComponent).not.toHaveBeenCalled();
+  });
+
+  it('loads a plugin with onLoad, handlers and frontend contributions', async () => {
+    createPlugin(
+      'loaded-plugin',
+      {
+        main: 'index.js',
+        frontend: [{ name: 'comp', type: 'component', src: 'comp.js' }],
+      },
+      `
+      export default {
+        onLoad: async (api) => { api.emit('plugin:loaded', { ok: true }); },
+        handlers: { 'plugin:event': (data) => {} }
+      };
+    `
+    );
+
+    const { loadPlugins } = await import('../plugin/loader.js');
+    await loadPlugins();
+
+    expect(mockRegisterComponent).toHaveBeenCalledWith(
+      'loaded-plugin',
+      [expect.objectContaining({ name: 'comp', src: 'comp.js' })],
+      join(pluginsDir, 'loaded-plugin')
+    );
+    expect(mockOn).toHaveBeenCalledWith('plugin:event', expect.any(Function));
+  });
+
+  it('skips directories without plugin.json', async () => {
+    mkdirSync(join(pluginsDir, 'no-manifest'), { recursive: true });
+    writeFileSync(join(pluginsDir, 'no-manifest', 'index.js'), 'export default {};');
+
+    const { loadPlugins } = await import('../plugin/loader.js');
+    await loadPlugins();
+
+    expect(mockRegisterComponent).not.toHaveBeenCalled();
+  });
+
+  it('skips plugin when main file does not exist', async () => {
+    createPlugin('missing-main', { main: 'missing.js' }, '');
+
+    const { loadPlugins } = await import('../plugin/loader.js');
+    await loadPlugins();
+
+    expect(mockRegisterComponent).not.toHaveBeenCalled();
+  });
+
+  it('catches and logs plugin load errors', async () => {
+    createPlugin('bad-plugin', { main: 'index.js' }, 'throw new Error("bad plugin");');
+
+    const { loadPlugins } = await import('../plugin/loader.js');
+    await expect(loadPlugins()).resolves.toBeUndefined();
+    expect(mockRegisterComponent).not.toHaveBeenCalled();
   });
 });

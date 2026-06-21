@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, Message, Provider, McpConfig } from '@ordpaw/shared';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { sessionManager } from './session.js';
 import { checkpointManager } from './checkpoint.js';
@@ -30,7 +31,10 @@ function resolveApiKey(provider: Provider | null, settingsApiKeys: Record<string
  * Build a chat-completion request body in OpenAI-compatible shape.
  * Anthropic is handled separately via its Messages API.
  */
-function buildOpenAIMessages(systemPrompt: string, messages: Message[]): Array<{ role: string; content: string }> {
+function buildOpenAIMessages(
+  systemPrompt: string,
+  messages: Message[]
+): Array<{ role: string; content: string }> {
   const out: Array<{ role: string; content: string }> = [];
   if (systemPrompt) out.push({ role: 'system', content: systemPrompt });
   for (const m of messages) {
@@ -56,23 +60,31 @@ async function callOpenAICompatible(opts: {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {})
+        ...(opts.apiKey ? { Authorization: `Bearer ${opts.apiKey}` } : {}),
       },
       body: JSON.stringify({
         model: opts.model,
         messages: opts.messages,
-        stream: false
-      })
+        stream: false,
+      }),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      debugLogger.log('error', `OpenAI-compatible call failed: ${res.status} ${text.slice(0, 200)}`, 'agent-runtime');
+      debugLogger.log(
+        'error',
+        `OpenAI-compatible call failed: ${res.status} ${text.slice(0, 200)}`,
+        'agent-runtime'
+      );
       return null;
     }
-    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
+    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
     return data?.choices?.[0]?.message?.content ?? '';
   } catch (err: unknown) {
-    debugLogger.log('error', `OpenAI-compatible fetch error: ${err instanceof Error ? err.message : String(err)}`, 'agent-runtime');
+    debugLogger.log(
+      'error',
+      `OpenAI-compatible fetch error: ${err instanceof Error ? err.message : String(err)}`,
+      'agent-runtime'
+    );
     return null;
   }
 }
@@ -89,31 +101,39 @@ async function callAnthropic(opts: {
 }): Promise<string | null> {
   const url = opts.baseUrl.replace(/\/+$/, '') + '/v1/messages';
   // Anthropic only accepts user/assistant roles in messages
-  const filtered = opts.messages.filter(m => m.role === 'user' || m.role === 'assistant');
+  const filtered = opts.messages.filter((m) => m.role === 'user' || m.role === 'assistant');
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': opts.apiKey,
-        'anthropic-version': '2023-06-01'
+        'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
         model: opts.model,
         system: opts.systemPrompt,
         messages: filtered,
-        max_tokens: 2048
-      })
+        max_tokens: 2048,
+      }),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      debugLogger.log('error', `Anthropic call failed: ${res.status} ${text.slice(0, 200)}`, 'agent-runtime');
+      debugLogger.log(
+        'error',
+        `Anthropic call failed: ${res.status} ${text.slice(0, 200)}`,
+        'agent-runtime'
+      );
       return null;
     }
-    const data = await res.json() as { content?: Array<{ text?: string }> };
-    return data?.content?.map(c => c.text).join('') ?? '';
+    const data = (await res.json()) as { content?: Array<{ text?: string }> };
+    return data?.content?.map((c) => c.text).join('') ?? '';
   } catch (err: unknown) {
-    debugLogger.log('error', `Anthropic fetch error: ${err instanceof Error ? err.message : String(err)}`, 'agent-runtime');
+    debugLogger.log(
+      'error',
+      `Anthropic fetch error: ${err instanceof Error ? err.message : String(err)}`,
+      'agent-runtime'
+    );
     return null;
   }
 }
@@ -124,7 +144,10 @@ async function callAnthropic(opts: {
 function loadSettingsApiKeys(): Record<string, string> {
   try {
     const db = getDatabase();
-    const row = queryOne<{ key: string; value_json: string }>(db, "SELECT value_json FROM settings WHERE key = 'apiKeys'");
+    const row = queryOne<{ key: string; value_json: string }>(
+      db,
+      "SELECT value_json FROM settings WHERE key = 'apiKeys'"
+    );
     if (!row) return {};
     return safeJsonParse<Record<string, string>>(row.value_json, {});
   } catch {
@@ -139,10 +162,16 @@ export class AgentRuntime {
 
     const agent = this.getAgent(conversation.agentId);
     if (!agent) {
-      throw new Error('Agent not found for conversation');
+      throw new OrdPawError('Agent not found for conversation', {
+        code: OrdPawErrorCode.NOT_FOUND,
+      });
     }
 
-    debugLogger.log('debug', `processMessage start: conversation=${conversationId}, agent=${agent.id}`, 'agent-runtime');
+    debugLogger.log(
+      'debug',
+      `processMessage start: conversation=${conversationId}, agent=${agent.id}`,
+      'agent-runtime'
+    );
 
     // 触发 message:before 事件
     await eventBus.emit('message:before', { conversationId, message: userMessage });
@@ -163,16 +192,35 @@ export class AgentRuntime {
       if (provider.type === 'anthropic') {
         const baseUrl = provider.baseUrl || 'https://api.anthropic.com';
         llmText = await callAnthropic({
-          baseUrl, apiKey, model: agent.model, systemPrompt, messages: openaiMessages.filter(m => m.role !== 'system')
+          baseUrl,
+          apiKey,
+          model: agent.model,
+          systemPrompt,
+          messages: openaiMessages.filter((m) => m.role !== 'system'),
         });
-      } else if (provider.type === 'openai' || provider.type === 'custom' || provider.type === 'ollama') {
-        const baseUrl = provider.baseUrl || (provider.type === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com');
-        llmText = await callOpenAICompatible({ baseUrl, apiKey, model: agent.model, messages: openaiMessages });
+      } else if (
+        provider.type === 'openai' ||
+        provider.type === 'custom' ||
+        provider.type === 'ollama'
+      ) {
+        const baseUrl =
+          provider.baseUrl ||
+          (provider.type === 'ollama' ? 'http://localhost:11434' : 'https://api.openai.com');
+        llmText = await callOpenAICompatible({
+          baseUrl,
+          apiKey,
+          model: agent.model,
+          messages: openaiMessages,
+        });
       }
 
       if (llmText && llmText.trim()) {
         assistantContent = llmText;
-        debugLogger.log('info', `LLM response received: conversation=${conversationId}, provider=${provider.name}, model=${agent.model}, len=${llmText.length}`, 'agent-runtime');
+        debugLogger.log(
+          'info',
+          `LLM response received: conversation=${conversationId}, provider=${provider.name}, model=${agent.model}, len=${llmText.length}`,
+          'agent-runtime'
+        );
       } else {
         assistantContent = `[OrdPaw] LLM 调用失败或返回空，使用降级响应。Agent: ${agent.name}, Provider: ${provider.name}, Model: ${agent.model}\n\n收到消息: "${userMessage}"`;
         debugLogger.log('warn', `LLM call returned empty, using fallback`, 'agent-runtime');
@@ -221,7 +269,7 @@ export class AgentRuntime {
         skills: safeJsonParse<string[]>(agent.skills_json, []),
         mcpServers: safeJsonParse<McpConfig[]>(agent.mcp_json, []),
         createdAt: agent.created_at,
-        updatedAt: agent.updated_at
+        updatedAt: agent.updated_at,
       };
       agentCache.set(id, parsed);
       return parsed;
@@ -231,7 +279,15 @@ export class AgentRuntime {
     }
   }
 
-  createAgent(data: { name: string; description?: string; systemPrompt?: string; providerId?: string; model?: string; skills?: string[]; mcpServers?: McpConfig[] }): Agent {
+  createAgent(data: {
+    name: string;
+    description?: string;
+    systemPrompt?: string;
+    providerId?: string;
+    model?: string;
+    skills?: string[];
+    mcpServers?: McpConfig[];
+  }): Agent {
     const db = getDatabase();
     const now = Date.now();
     const id = uuidv4();
@@ -243,10 +299,13 @@ export class AgentRuntime {
     const skillsJson = JSON.stringify(data.skills || []);
     const mcpJson = JSON.stringify(data.mcpServers || []);
 
-    db.run(`
+    db.run(
+      `
       INSERT INTO agents (id, name, description, system_prompt, provider_id, model, skills_json, mcp_json, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, safeName, safeDesc, safePrompt, safeProvider, safeModel, skillsJson, mcpJson, now, now]);
+    `,
+      [id, safeName, safeDesc, safePrompt, safeProvider, safeModel, skillsJson, mcpJson, now, now]
+    );
 
     saveDatabase();
     return this.getAgent(id)!;
@@ -256,7 +315,7 @@ export class AgentRuntime {
     try {
       const db = getDatabase();
       const rows = queryAll<AgentRow>(db, 'SELECT * FROM agents ORDER BY updated_at DESC');
-      return rows.map(agent => ({
+      return rows.map((agent) => ({
         id: agent.id,
         name: agent.name,
         description: agent.description,
@@ -266,7 +325,7 @@ export class AgentRuntime {
         skills: safeJsonParse<string[]>(agent.skills_json, []),
         mcpServers: safeJsonParse<McpConfig[]>(agent.mcp_json, []),
         createdAt: agent.created_at,
-        updatedAt: agent.updated_at
+        updatedAt: agent.updated_at,
       }));
     } catch (err) {
       logger.error(err, 'listAgents 错误:');

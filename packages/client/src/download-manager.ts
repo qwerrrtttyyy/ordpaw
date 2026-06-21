@@ -4,7 +4,7 @@ import type {
   DownloadTask,
   StorageLocation,
   StorageQuota,
-  BrowserStorageBackend
+  BrowserStorageBackend,
 } from '@ordpaw/shared';
 import { API } from './api';
 import { logger } from './logger';
@@ -87,7 +87,7 @@ class IndexedDBStorage implements DownloadStorageBackend {
       type: item.type,
       name: item.name,
       blob,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
     return new Promise((resolve, reject) => {
       const request = store.put(record);
@@ -133,7 +133,7 @@ class LocalStorageStorage implements DownloadStorageBackend {
       type: item.type,
       name: item.name,
       base64,
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     });
     localStorage.setItem(this.key(item.id), payload);
   }
@@ -222,7 +222,9 @@ export class DownloadManager extends EventTarget {
 
   async chooseFileSystemDirectory(): Promise<boolean> {
     try {
-      const picker = (window as unknown as { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
+      const picker = (
+        window as unknown as { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> }
+      ).showDirectoryPicker;
       if (!picker) return false;
       const handle = await picker();
       this.fsaStorage.setDirectory(handle);
@@ -233,25 +235,28 @@ export class DownloadManager extends EventTarget {
   }
 
   getTasks(): DownloadTask[] {
-    return this.tasks.map(t => ({ ...t }));
+    return this.tasks.map((t) => ({ ...t }));
   }
 
   getTask(id: string): DownloadTask | undefined {
-    return this.tasks.find(t => t.id === id);
+    return this.tasks.find((t) => t.id === id);
   }
 
-  addTask(items: DownloadItem[], options: { storage: StorageLocation; serverPath?: string; quota?: StorageQuota }): DownloadTask {
+  addTask(
+    items: DownloadItem[],
+    options: { storage: StorageLocation; serverPath?: string; quota?: StorageQuota }
+  ): DownloadTask {
     const task: DownloadTask = {
       id: generateId(),
       status: 'pending',
-      items: items.map(i => ({ ...i })),
+      items: items.map((i) => ({ ...i })),
       storage: options.storage,
       serverPath: options.serverPath,
       progress: 0,
       downloadedBytes: 0,
       totalBytes: items.reduce((sum, i) => sum + (i.size || 0), 0),
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
     };
     this.tasks.unshift(task);
     this.persistTasks();
@@ -273,7 +278,11 @@ export class DownloadManager extends EventTarget {
 
     const state = this.runtimeStates.get(id);
     if (state?.abortController) {
-      try { state.abortController.abort(); } catch {}
+      try {
+        state.abortController.abort();
+      } catch {
+        /* abort may throw if already aborted */
+      }
     }
     task.status = 'paused';
     this.stopPolling(id);
@@ -313,7 +322,11 @@ export class DownloadManager extends EventTarget {
 
     const state = this.runtimeStates.get(id);
     if (state?.abortController) {
-      try { state.abortController.abort(); } catch {}
+      try {
+        state.abortController.abort();
+      } catch {
+        /* abort may throw if already aborted */
+      }
     }
     task.status = 'cancelled';
     this.stopPolling(id);
@@ -329,7 +342,7 @@ export class DownloadManager extends EventTarget {
       this.cancelTask(id);
       return;
     }
-    this.tasks = this.tasks.filter(t => t.id !== id);
+    this.tasks = this.tasks.filter((t) => t.id !== id);
     this.runtimeStates.delete(id);
     this.serverTaskMap.delete(id);
     this.stopPolling(id);
@@ -338,13 +351,15 @@ export class DownloadManager extends EventTarget {
   }
 
   clearCompleted(): void {
-    this.tasks = this.tasks.filter(t => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'failed');
+    this.tasks = this.tasks.filter(
+      (t) => t.status !== 'completed' && t.status !== 'cancelled' && t.status !== 'failed'
+    );
     this.persistTasks();
     this.emitTasksChanged();
   }
 
   private getMutableTask(id: string): DownloadTask | undefined {
-    return this.tasks.find(t => t.id === id);
+    return this.tasks.find((t) => t.id === id);
   }
 
   private loadTasks(): void {
@@ -371,10 +386,10 @@ export class DownloadManager extends EventTarget {
   }
 
   private async processQueue(): Promise<void> {
-    const runningCount = this.tasks.filter(t => t.status === 'running').length;
+    const runningCount = this.tasks.filter((t) => t.status === 'running').length;
     if (runningCount >= this.maxConcurrent) return;
 
-    const pending = this.tasks.find(t => t.status === 'pending');
+    const pending = this.tasks.find((t) => t.status === 'pending');
     if (!pending) return;
 
     pending.status = 'running';
@@ -382,7 +397,7 @@ export class DownloadManager extends EventTarget {
     this.persistTasks();
     this.emitTasksChanged();
 
-    this.runTask(pending.id).catch(err => {
+    this.runTask(pending.id).catch((err) => {
       logger.error(err, '下载任务执行失败');
     });
 
@@ -463,7 +478,7 @@ export class DownloadManager extends EventTarget {
     const result = await this.api.prepareServerDownload({
       items: task.items,
       serverPath,
-      quota: task.storageQuota || this.getDefaultQuota()
+      quota: task.storageQuota || this.getDefaultQuota(),
     });
     this.serverTaskMap.set(task.id, result.taskId);
     state.serverTaskId = result.taskId;
@@ -477,7 +492,11 @@ export class DownloadManager extends EventTarget {
         try {
           const status = await this.api.getServerDownloadStatus(serverTaskId);
           this.updateTaskFromServer(task, status);
-          if (task.status === 'completed' || task.status === 'failed' || task.status === 'cancelled') {
+          if (
+            task.status === 'completed' ||
+            task.status === 'failed' ||
+            task.status === 'cancelled'
+          ) {
             this.stopPolling(task.id);
             resolve();
             return;
@@ -527,14 +546,18 @@ export class DownloadManager extends EventTarget {
     const chunks: Uint8Array[] = [];
     let itemReceived = 0;
 
-    while (true) {
+    let done = false;
+    while (!done) {
       if (task.status === 'cancelled' || task.status === 'paused') {
         controller.abort();
         reader.releaseLock();
         throw new Error(task.status === 'paused' ? '已暂停' : '已取消');
       }
-      const { done, value } = await reader.read();
+      const result = await reader.read();
+      done = result.done;
       if (done) break;
+      const value = result.value;
+      if (!value) continue;
       chunks.push(value);
       itemReceived += value.length;
       task.downloadedBytes += value.length;
@@ -582,7 +605,11 @@ export class DownloadManager extends EventTarget {
     }
   }
 
-  private async checkBrowserQuota(storage: DownloadStorageBackend, addBytes: number, quota: StorageQuota): Promise<void> {
+  private async checkBrowserQuota(
+    storage: DownloadStorageBackend,
+    addBytes: number,
+    quota: StorageQuota
+  ): Promise<void> {
     if (!quota.enforce) return;
     const max = quota.browserMaxBytes ?? DEFAULT_BROWSER_MAX_BYTES;
     const current = await storage.estimateUsage();
@@ -596,7 +623,7 @@ export class DownloadManager extends EventTarget {
       browserMaxBytes: DEFAULT_BROWSER_MAX_BYTES,
       serverMaxBytes: DEFAULT_SERVER_MAX_BYTES,
       enforce: true,
-      serverPath: './downloads'
+      serverPath: './downloads',
     };
   }
 }

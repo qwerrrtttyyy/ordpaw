@@ -1,10 +1,11 @@
 import { t } from '../i18n';
+import type { StatsResponse } from '@ordpaw/shared';
 
 export class MobileDrawer {
   private overlay: HTMLElement;
   private drawer: HTMLElement;
   private navigateCallback?: (route: string) => void;
-  private stats: Record<string, number> = {
+  private stats: StatsResponse = {
     agents: 0,
     conversations: 0,
     plugins: 0,
@@ -13,7 +14,8 @@ export class MobileDrawer {
     providers: 0,
     testSuites: 0,
     mcpServers: 0,
-    installedSkills: 0
+    installedSkills: 0,
+    skills: 0,
   };
 
   constructor() {
@@ -24,7 +26,7 @@ export class MobileDrawer {
     this.overlay.addEventListener('click', () => this.close());
   }
 
-  setStats(stats: Record<string, number>) {
+  setStats(stats: StatsResponse) {
     this.stats = stats;
     this.render();
   }
@@ -112,7 +114,7 @@ export class MobileDrawer {
       </nav>
     `;
 
-    this.drawer.querySelectorAll('.nav-item').forEach(item => {
+    this.drawer.querySelectorAll('.nav-item').forEach((item) => {
       item.addEventListener('click', (e) => {
         e.stopPropagation();
         const route = item.getAttribute('data-route');
@@ -143,7 +145,7 @@ export class MobileDrawer {
   }
 
   setActive(route: string) {
-    this.drawer.querySelectorAll('.nav-item').forEach(item => {
+    this.drawer.querySelectorAll('.nav-item').forEach((item) => {
       if (item.getAttribute('data-route') === route) {
         item.classList.add('active');
       } else {

@@ -1,3 +1,5 @@
+import type { BindParams, QueryExecResult } from 'sql.js';
+
 /**
  * Shared database helpers — extracted to deduplicate the 8+ copies of
  * safeJsonParse / rowToObject that previously lived across core modules.
@@ -33,23 +35,23 @@ export function rowToObject(columns: string[], row: unknown[]): Record<string, u
  * Run a SELECT and return all rows as objects. Returns [] when no rows.
  */
 export function queryAll<T = Record<string, unknown>>(
-  db: { exec: (sql: string, params?: unknown[]) => Array<{ columns: string[]; values: unknown[][] }> },
+  db: { exec: (sql: string, params?: BindParams) => QueryExecResult[] },
   sql: string,
-  params: unknown[] = []
+  params: BindParams = []
 ): T[] {
   const result = db.exec(sql, params);
   if (result.length === 0 || result[0].values.length === 0) return [];
   const { columns, values } = result[0];
-  return values.map(row => rowToObject(columns, row) as T);
+  return values.map((row) => rowToObject(columns, row) as T);
 }
 
 /**
  * Run a SELECT and return the first row as an object, or null when no rows.
  */
 export function queryOne<T = Record<string, unknown>>(
-  db: { exec: (sql: string, params?: unknown[]) => Array<{ columns: string[]; values: unknown[][] }> },
+  db: { exec: (sql: string, params?: BindParams) => QueryExecResult[] },
   sql: string,
-  params: unknown[] = []
+  params: BindParams = []
 ): T | null {
   const rows = queryAll<T>(db, sql, params);
   return rows.length > 0 ? rows[0] : null;
@@ -59,9 +61,9 @@ export function queryOne<T = Record<string, unknown>>(
  * Count rows for a query. Returns 0 on any error or empty result.
  */
 export function safeCount(
-  db: { exec: (sql: string, params?: unknown[]) => Array<{ columns: string[]; values: unknown[][] }> },
+  db: { exec: (sql: string, params?: BindParams) => QueryExecResult[] },
   sql: string,
-  params: unknown[] = []
+  params: BindParams = []
 ): number {
   const result = db.exec(sql, params);
   if (result.length === 0 || result[0].values.length === 0) return 0;

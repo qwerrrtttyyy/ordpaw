@@ -79,12 +79,17 @@ export class ChatView {
         const msg = JSON.parse(event.data);
         if (msg.type === 'chat:stream' && msg.payload?.conversationId === this.conversationId) {
           this.handleStreamChunk(msg.payload);
-        } else if (msg.type === 'chat:done' && msg.payload?.conversationId === this.conversationId) {
+        } else if (
+          msg.type === 'chat:done' &&
+          msg.payload?.conversationId === this.conversationId
+        ) {
           this.handleStreamDone(msg.payload);
         } else if (msg.type === 'error' && msg.payload?.conversationId === this.conversationId) {
           this.handleStreamError(msg.payload);
         }
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     };
 
     ws.addEventListener('message', messageHandler);
@@ -186,7 +191,7 @@ export class ChatView {
       this.assistantRenderers.set(msg.id, {
         render: (newText: string) => {
           renderer.render(newText);
-        }
+        },
       });
     } else {
       text.innerHTML = `<p>${escapeHtml(msg.content)}</p>`;
@@ -236,22 +241,31 @@ export class ChatView {
     // Try WebSocket first
     const ws = window.__ordpaw?.ws;
     if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'chat:message',
-        payload: { conversationId: this.conversationId, content }
-      }));
+      ws.send(
+        JSON.stringify({
+          type: 'chat:message',
+          payload: { conversationId: this.conversationId, content },
+        })
+      );
     } else {
       // REST fallback
       try {
         const result = await this.api.sendMessage(this.conversationId, content);
         const renderer = this.assistantRenderers.get(assistantId);
-        if (renderer && result?.content) {
-          renderer.render(result.content);
+        if (
+          renderer &&
+          typeof result === 'object' &&
+          result !== null &&
+          'content' in result &&
+          typeof (result as { content: unknown }).content === 'string'
+        ) {
+          renderer.render((result as { content: string }).content);
         }
-      } catch (err: any) {
+      } catch (err) {
         const renderer = this.assistantRenderers.get(assistantId);
         if (renderer) {
-          renderer.render(`**错误:** ${escapeHtml(err.message)}`);
+          const message = err instanceof Error ? err.message : String(err);
+          renderer.render(`**错误:** ${escapeHtml(message)}`);
         }
       }
       this.streaming = false;

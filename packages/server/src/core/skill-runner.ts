@@ -1,56 +1,96 @@
-import type { SkillDefinition, SkillContext, InstalledSkill, SkillInstallResult, SkillExecuteResult, InstallSkillRequest } from '@ordpaw/shared';
+import type {
+  SkillDefinition,
+  SkillContext,
+  InstalledSkill,
+  SkillInstallResult,
+  SkillExecuteResult,
+  InstallSkillRequest,
+} from '@ordpaw/shared';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
 import { v4 as uuidv4 } from 'uuid';
 import vm from 'vm';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { logger } from './logger.js';
-
-interface SkillRow {
-  id: string;
-  name: string;
-  description: string;
-  parameters_json: string;
-  code: string;
-  source: 'builtin' | 'user';
-  enabled: number;
-  created_at: number;
-  updated_at: number;
-}
 
 class SkillRunner {
   private skills: Map<string, SkillDefinition> = new Map();
   private installedMeta: Map<string, InstalledSkill> = new Map();
   private static readonly SKILL_TIMEOUT_MS = 5000;
   private static readonly ALLOWED_GLOBALS = [
-    'console', 'Math', 'JSON', 'Date', 'Array', 'Object', 'String',
-    'Number', 'Boolean', 'RegExp', 'Error', 'Map', 'Set', 'Promise',
-    'parseInt', 'parseFloat', 'isNaN', 'isFinite',
-    'encodeURIComponent', 'decodeURIComponent', 'setTimeout', 'clearTimeout',
+    'console',
+    'Math',
+    'JSON',
+    'Date',
+    'Array',
+    'Object',
+    'String',
+    'Number',
+    'Boolean',
+    'RegExp',
+    'Error',
+    'Map',
+    'Set',
+    'Promise',
+    'parseInt',
+    'parseFloat',
+    'isNaN',
+    'isFinite',
+    'encodeURIComponent',
+    'decodeURIComponent',
+    'setTimeout',
+    'clearTimeout',
   ];
 
   init(): void {
     // Register built-in skills
-    this.registerBuiltin('echo', '回显输入内容', {
-      type: 'object',
-      properties: { message: { type: 'string' } },
-      required: ['message'],
-    }, async (params: Record<string, unknown>) => ({ echo: params.message }));
+    this.registerBuiltin(
+      'echo',
+      '回显输入内容',
+      {
+        type: 'object',
+        properties: { message: { type: 'string' } },
+        required: ['message'],
+      },
+      async (params: unknown) => {
+        const record =
+          typeof params === 'object' && params !== null ? (params as Record<string, unknown>) : {};
+        return { echo: record.message };
+      }
+    );
 
-    this.registerBuiltin('time', '获取当前时间', {
-      type: 'object', properties: {},
-    }, async () => ({ time: new Date().toISOString() }));
+    this.registerBuiltin(
+      'time',
+      '获取当前时间',
+      {
+        type: 'object',
+        properties: {},
+      },
+      async () => ({ time: new Date().toISOString() })
+    );
 
     // Load persisted user skills
     this.loadInstalledFromDb();
     logger.info(`SkillRunner 已初始化 (${this.skills.size} 个技能)`);
   }
 
-  private registerBuiltin(name: string, description: string, parameters: Record<string, unknown>, execute: (params: Record<string, unknown>) => Promise<Record<string, unknown>>): void {
+  private registerBuiltin(
+    name: string,
+    description: string,
+    parameters: Record<string, unknown>,
+    execute: (params: unknown, context: SkillContext) => Promise<unknown>
+  ): void {
     const id = `builtin-${name}`;
     this.skills.set(id, { id, name, description, parameters, execute });
     this.installedMeta.set(id, {
-      id, name, description, parameters, code: '',
-      source: 'builtin', enabled: true,
-      createdAt: Date.now(), updatedAt: Date.now(),
+      id,
+      name,
+      description,
+      parameters,
+      code: '',
+      source: 'builtin',
+      enabled: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
     });
   }
 
@@ -127,7 +167,10 @@ class SkillRunner {
         return { result, logs };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`技能执行错误: ${msg}`);
+        throw new OrdPawError(`技能执行错误: ${msg}`, {
+          code: OrdPawErrorCode.INTERNAL_ERROR,
+          cause: err,
+        });
       }
     };
 
@@ -146,14 +189,17 @@ class SkillRunner {
     const id = uuidv4();
     const now = Date.now();
     const paramsJson = JSON.stringify(req.parameters || {});
-    const source: 'user' = 'user';
+    const source = 'user' as const;
 
     // Validate code by attempting to compile it
     try {
       new vm.Script(`(function() { ${req.code} })()`, { filename: 'validate.js' });
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`技能代码验证失败: ${msg}`);
+      throw new OrdPawError(`技能代码验证失败: ${msg}`, {
+        code: OrdPawErrorCode.BAD_REQUEST,
+        cause: err,
+      });
     }
 
     try {
@@ -165,13 +211,22 @@ class SkillRunner {
       saveDatabase();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`技能安装失败: ${msg}`);
+      throw new OrdPawError(`技能安装失败: ${msg}`, {
+        code: OrdPawErrorCode.INTERNAL_ERROR,
+        cause: err,
+      });
     }
 
     const meta: InstalledSkill = {
-      id, name: req.name, description: req.description || '',
-      parameters: req.parameters || {}, code: req.code,
-      source, enabled: true, createdAt: now, updatedAt: now,
+      id,
+      name: req.name,
+      description: req.description || '',
+      parameters: req.parameters || {},
+      code: req.code,
+      source,
+      enabled: true,
+      createdAt: now,
+      updatedAt: now,
     };
     this.installedMeta.set(id, meta);
 
@@ -183,13 +238,20 @@ class SkillRunner {
       saveDatabase();
       this.installedMeta.delete(id);
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`技能注册失败，已回滚: ${msg}`);
+      throw new OrdPawError(`技能注册失败，已回滚: ${msg}`, {
+        code: OrdPawErrorCode.INTERNAL_ERROR,
+        cause: err,
+      });
     }
 
     return { id, name: req.name, description: req.description || '', source };
   }
 
-  async executeSkill(id: string, params: unknown, context: SkillContext): Promise<SkillExecuteResult> {
+  async executeSkill(
+    id: string,
+    params: unknown,
+    context: SkillContext
+  ): Promise<SkillExecuteResult> {
     const skill = this.skills.get(id);
     if (!skill) {
       return { success: false, error: `技能不存在: ${id}` };
@@ -207,7 +269,7 @@ class SkillRunner {
     if (!this.skills.has(id)) return false;
     const meta = this.installedMeta.get(id);
     if (meta && meta.source === 'builtin') {
-      throw new Error('内置技能无法卸载');
+      throw new OrdPawError('内置技能无法卸载', { code: OrdPawErrorCode.FORBIDDEN });
     }
     this.skills.delete(id);
     this.installedMeta.delete(id);

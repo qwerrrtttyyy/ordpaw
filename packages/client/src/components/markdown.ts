@@ -56,7 +56,7 @@ export class MarkdownRenderer {
       listType = null;
     };
 
-    for (let raw of lines) {
+    for (const raw of lines) {
       const line = raw.replace(/\r$/, '');
 
       if (line.startsWith('```')) {
@@ -163,18 +163,18 @@ export class MarkdownRenderer {
   }
 
   private attachCodeActions() {
-    this.container.querySelectorAll('.copy-btn').forEach(btn => {
+    this.container.querySelectorAll('.copy-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const code = this.decodeAttr(btn.getAttribute('data-code') || '');
         navigator.clipboard.writeText(code).then(() => {
           const original = btn.textContent || '';
           btn.textContent = t('common.copied');
-          setTimeout(() => btn.textContent = original, 1500);
+          setTimeout(() => (btn.textContent = original), 1500);
         });
       });
     });
 
-    this.container.querySelectorAll('.preview-btn').forEach(btn => {
+    this.container.querySelectorAll('.preview-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = btn.getAttribute('data-preview');
         const preview = this.container.querySelector(`#${id}`) as HTMLElement | null;

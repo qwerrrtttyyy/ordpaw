@@ -1,5 +1,7 @@
 node_modules
+.pnpm-store/
 dist
+coverage/
 .DS_Store
 *.log
 .env
@@ -7,3 +9,5 @@ dist
 data/
 plugins/
 *.tsbuildinfo
+.husky/_
+

@@ -1,5 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { TestSuite, TestCase, TestRun, TestRunResult, CreateTestSuiteRequest } from '@ordpaw/shared';
+import type { BindParams } from 'sql.js';
+import type {
+  TestSuite,
+  TestCase,
+  TestRun,
+  TestRunResult,
+  CreateTestSuiteRequest,
+} from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { agentRuntime } from './agent-runtime.js';
 import { sessionManager } from './session.js';
@@ -42,9 +49,13 @@ export class TestSuiteManager {
     try {
       const db = getDatabase();
       const rows = agentId
-        ? queryAll<SuiteRow>(db, 'SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
+        ? queryAll<SuiteRow>(
+            db,
+            'SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC',
+            [agentId]
+          )
         : queryAll<SuiteRow>(db, 'SELECT * FROM test_suites ORDER BY updated_at DESC');
-      return rows.map(row => this.rowToSuite(row));
+      return rows.map((row) => this.rowToSuite(row));
     } catch (err) {
       logger.error(err, 'listSuites 错误:');
       return [];
@@ -70,10 +81,13 @@ export class TestSuiteManager {
     const name = (data.name || '未命名测试套件').toString();
     const description = (data.description || '').toString();
 
-    db.run(`
+    db.run(
+      `
       INSERT INTO test_suites (id, agent_id, name, description, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [id, agentId, name, description, now, now]);
+    `,
+      [id, agentId, name, description, now, now]
+    );
 
     const cases = data.cases || [];
     for (const c of cases) {
@@ -90,7 +104,7 @@ export class TestSuiteManager {
 
     const db = getDatabase();
     const updates: string[] = [];
-    const params: unknown[] = [];
+    const params: BindParams = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -140,7 +154,7 @@ export class TestSuiteManager {
 
     const db = getDatabase();
     const updates: string[] = [];
-    const params: unknown[] = [];
+    const params: BindParams = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -217,7 +231,8 @@ export class TestSuiteManager {
         output = error || '';
       }
       const duration = Date.now() - start;
-      if (ok) passed++; else failed++;
+      if (ok) passed++;
+      else failed++;
       results.push({ caseId: testCase.id, passed: ok, output, duration, error });
     }
 
@@ -228,14 +243,17 @@ export class TestSuiteManager {
       results,
       passed,
       failed,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
 
     const db = getDatabase();
-    db.run(`
+    db.run(
+      `
       INSERT INTO test_runs (id, suite_id, agent_id, results_json, passed, failed, created_at)
       VALUES (?, ?, ?, ?, ?, ?, ?)
-    `, [run.id, suiteId, agent.id, JSON.stringify(results), passed, failed, run.createdAt]);
+    `,
+      [run.id, suiteId, agent.id, JSON.stringify(results), passed, failed, run.createdAt]
+    );
     saveDatabase();
 
     return run;
@@ -244,15 +262,19 @@ export class TestSuiteManager {
   listRuns(suiteId: string): TestRun[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<RunRow>(db, 'SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC', [suiteId]);
-      return rows.map(r => ({
+      const rows = queryAll<RunRow>(
+        db,
+        'SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC',
+        [suiteId]
+      );
+      return rows.map((r) => ({
         id: r.id,
         suiteId: r.suite_id,
         agentId: r.agent_id,
         results: safeJsonParse<TestRunResult[]>(r.results_json, []),
         passed: r.passed,
         failed: r.failed,
-        createdAt: r.created_at
+        createdAt: r.created_at,
       }));
     } catch (err) {
       logger.error(err, 'listRuns 错误:');
@@ -262,20 +284,27 @@ export class TestSuiteManager {
 
   private normalizeExpectedContains(value: unknown): string[] {
     if (Array.isArray(value)) {
-      return value.map(v => String(v).trim()).filter(Boolean);
+      return value.map((v) => String(v).trim()).filter(Boolean);
     }
     if (typeof value === 'string' && value.trim().length > 0) {
-      return value.split(',').map(s => s.trim()).filter(Boolean);
+      return value
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
     return [];
   }
 
   private evaluateCase(testCase: TestCase, output: string): boolean {
-    if (testCase.expectedOutput !== undefined && testCase.expectedOutput !== null && testCase.expectedOutput !== '') {
+    if (
+      testCase.expectedOutput !== undefined &&
+      testCase.expectedOutput !== null &&
+      testCase.expectedOutput !== ''
+    ) {
       return output.trim() === testCase.expectedOutput.trim();
     }
     if (testCase.expectedContains && testCase.expectedContains.length > 0) {
-      return testCase.expectedContains.every(c => output.includes(c));
+      return testCase.expectedContains.every((c) => output.includes(c));
     }
     return output.trim().length > 0;
   }
@@ -290,10 +319,23 @@ export class TestSuiteManager {
     const expectedContains = this.normalizeExpectedContains(data.expectedContains);
     const variables = data.variables || {};
 
-    db.run(`
+    db.run(
+      `
       INSERT INTO test_cases (id, suite_id, name, input, expected_output, expected_contains_json, variables_json, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [id, suiteId, name, input, expectedOutput, JSON.stringify(expectedContains), JSON.stringify(variables), now, now]);
+    `,
+      [
+        id,
+        suiteId,
+        name,
+        input,
+        expectedOutput,
+        JSON.stringify(expectedContains),
+        JSON.stringify(variables),
+        now,
+        now,
+      ]
+    );
 
     return {
       id,
@@ -304,7 +346,7 @@ export class TestSuiteManager {
       expectedContains,
       variables,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
     };
   }
 
@@ -327,15 +369,19 @@ export class TestSuiteManager {
       description: s.description,
       cases: this.getSuiteCases(s.id),
       createdAt: s.created_at,
-      updatedAt: s.updated_at
+      updatedAt: s.updated_at,
     };
   }
 
   private getSuiteCases(suiteId: string): TestCase[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<CaseRow>(db, 'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC', [suiteId]);
-      return rows.map(row => this.rowToCase(row));
+      const rows = queryAll<CaseRow>(
+        db,
+        'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC',
+        [suiteId]
+      );
+      return rows.map((row) => this.rowToCase(row));
     } catch (err) {
       logger.error(err, 'getSuiteCases 错误:');
       return [];
@@ -352,7 +398,7 @@ export class TestSuiteManager {
       expectedContains: safeJsonParse<string[]>(c.expected_contains_json, []),
       variables: safeJsonParse<Record<string, unknown>>(c.variables_json, {}),
       createdAt: c.created_at,
-      updatedAt: c.updated_at
+      updatedAt: c.updated_at,
     };
   }
 }

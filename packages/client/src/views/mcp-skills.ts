@@ -42,7 +42,7 @@ export class McpSkillsView {
       const btn = (e.target as HTMLElement).closest('.tab-btn') as HTMLElement;
       if (!btn) return;
       const tab = btn.dataset.tab as TabId;
-      tabContainer.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      tabContainer.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
       this.tab = tab;
       this.render();
@@ -59,7 +59,7 @@ export class McpSkillsView {
       this.mcpServers = [];
     }
     try {
-      this.installedSkills = await this.api.getSkills();
+      this.installedSkills = (await this.api.getSkills()) as InstalledSkill[];
     } catch {
       this.installedSkills = [];
     }
@@ -126,7 +126,7 @@ export class McpSkillsView {
           </div>
         `;
 
-        card.querySelectorAll('button').forEach(btn => {
+        card.querySelectorAll('button').forEach((btn) => {
           btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const action = (e.currentTarget as HTMLElement).dataset.action;
@@ -221,11 +221,19 @@ export class McpSkillsView {
         const command = (overlayEl.querySelector('#mcpCommand') as HTMLInputElement)?.value.trim();
         const url = (overlayEl.querySelector('#mcpUrl') as HTMLInputElement)?.value.trim();
         const envRaw = (overlayEl.querySelector('#mcpEnv') as HTMLTextAreaElement)?.value.trim();
-        if (!name) { showToast(t('mcpSkills.nameRequired')); return false; }
+        if (!name) {
+          showToast(t('mcpSkills.nameRequired'));
+          return false;
+        }
 
         let env: Record<string, string> | undefined;
         if (envRaw) {
-          try { env = JSON.parse(envRaw); } catch { showToast(t('mcpSkills.envInvalid')); return false; }
+          try {
+            env = JSON.parse(envRaw);
+          } catch {
+            showToast(t('mcpSkills.envInvalid'));
+            return false;
+          }
         }
 
         try {
@@ -237,7 +245,7 @@ export class McpSkillsView {
           showToast(err.message);
           return false;
         }
-      }
+      },
     });
   }
 
@@ -281,7 +289,7 @@ export class McpSkillsView {
           <div class="skill-result" id="skillResult_${skill.id}" style="display:none"></div>
         `;
 
-        card.querySelectorAll('button').forEach(btn => {
+        card.querySelectorAll('button').forEach((btn) => {
           btn.addEventListener('click', async (e) => {
             e.stopPropagation();
             const action = (e.currentTarget as HTMLElement).dataset.action;
@@ -362,10 +370,18 @@ export class McpSkillsView {
       cancelText: '取消',
       onSubmit: async (overlayEl) => {
         const name = (overlayEl.querySelector('#skillName') as HTMLInputElement)?.value.trim();
-        const description = (overlayEl.querySelector('#skillDesc') as HTMLInputElement)?.value.trim();
+        const description = (
+          overlayEl.querySelector('#skillDesc') as HTMLInputElement
+        )?.value.trim();
         const code = (overlayEl.querySelector('#skillCode') as HTMLTextAreaElement)?.value.trim();
-        if (!name) { showToast(t('mcpSkills.nameRequired')); return false; }
-        if (!code) { showToast(t('mcpSkills.codeRequired')); return false; }
+        if (!name) {
+          showToast(t('mcpSkills.nameRequired'));
+          return false;
+        }
+        if (!code) {
+          showToast(t('mcpSkills.codeRequired'));
+          return false;
+        }
 
         try {
           await this.api.installSkill({ name, description, code });
@@ -376,7 +392,7 @@ export class McpSkillsView {
           showToast(err.message);
           return false;
         }
-      }
+      },
     });
   }
 }

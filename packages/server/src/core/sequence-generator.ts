@@ -3,7 +3,7 @@
  * 后端生成操作序列 → 前端通过 WebSocket 接收并执行
  */
 
-import type { Operation, OperationSequence, OperationResult, OperationType } from '@ordpaw/shared';
+import type { Operation, OperationSequence, OperationType } from '@ordpaw/shared';
 
 /** 操作权限级别 */
 export enum PermissionLevel {
@@ -42,13 +42,16 @@ const SANDBOX_CONFIG = {
   maxConcurrentSequences: 5,
   maxTimeout: 60000,
   allowedRoutes: [
-    '#/', '#/conversations', '#/agents', '#/plugins',
-    '#/prompts', '#/scripts', '#/debug', '#/settings',
+    '#/',
+    '#/conversations',
+    '#/agents',
+    '#/plugins',
+    '#/prompts',
+    '#/scripts',
+    '#/debug',
+    '#/settings',
   ],
-  blockedSelectors: [
-    /\b(admin|system|critical)\b/i,
-    /\b(password|secret|token)\b/i,
-  ],
+  blockedSelectors: [/\b(admin|system|critical)\b/i, /\b(password|secret|token)\b/i],
   rateLimit: {
     maxSequencesPerMinute: 10,
     maxOperationsPerMinute: 100,
@@ -57,10 +60,16 @@ const SANDBOX_CONFIG = {
 
 /** 操作白名单 */
 const ALLOWED_OPERATIONS = new Set<OperationType>([
-  'ui:click', 'ui:navigate', 'ui:theme',
-  'ui:input', 'ui:scroll', 'ui:highlight',
-  'chat:send', 'chat:clear',
-  'animation:play', 'notification:show',
+  'ui:click',
+  'ui:navigate',
+  'ui:theme',
+  'ui:input',
+  'ui:scroll',
+  'ui:highlight',
+  'chat:send',
+  'chat:clear',
+  'animation:play',
+  'notification:show',
 ]);
 
 /** 速率限制器 */
@@ -70,7 +79,7 @@ class RateLimiter {
   check(key: string, maxPerMinute: number): boolean {
     const now = Date.now();
     const windowMs = 60000;
-    const recent = (this.timestamps.get(key) || []).filter(t => now - t < windowMs);
+    const recent = (this.timestamps.get(key) || []).filter((t) => now - t < windowMs);
     recent.push(now);
     this.timestamps.set(key, recent);
     return recent.length <= maxPerMinute;
@@ -80,17 +89,26 @@ class RateLimiter {
 const rateLimiter = new RateLimiter();
 
 /** 权限检查 */
-export function checkPermission(operation: Operation, userRole: string): { allowed: boolean; reason?: string } {
+export function checkPermission(
+  operation: Operation,
+  userRole: string
+): { allowed: boolean; reason?: string } {
   const required = OPERATION_PERMISSIONS[operation.type];
   const userLevel = ROLE_PERMISSIONS[userRole] ?? PermissionLevel.NONE;
   if (userLevel < required) {
-    return { allowed: false, reason: `需要 ${PermissionLevel[required]} 权限，当前 ${PermissionLevel[userLevel]}` };
+    return {
+      allowed: false,
+      reason: `需要 ${PermissionLevel[required]} 权限，当前 ${PermissionLevel[userLevel]}`,
+    };
   }
   return { allowed: true };
 }
 
 /** 沙箱验证 */
-export function validateSequence(sequence: OperationSequence, userId: string): { valid: boolean; errors: string[] } {
+export function validateSequence(
+  sequence: OperationSequence,
+  userId: string
+): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
   // 速率限制
@@ -100,7 +118,9 @@ export function validateSequence(sequence: OperationSequence, userId: string): {
 
   // 操作数量限制
   if (sequence.operations.length > SANDBOX_CONFIG.maxOperationsPerSequence) {
-    errors.push(`操作数量超过限制: ${sequence.operations.length} > ${SANDBOX_CONFIG.maxOperationsPerSequence}`);
+    errors.push(
+      `操作数量超过限制: ${sequence.operations.length} > ${SANDBOX_CONFIG.maxOperationsPerSequence}`
+    );
   }
 
   for (const op of sequence.operations) {
@@ -139,7 +159,7 @@ export class SequenceGenerator {
   async generate(
     intent: string,
     entities: Record<string, unknown>,
-    context: { conversationId: string; userId: string }
+    _context: { conversationId: string; userId: string }
   ): Promise<OperationSequence | null> {
     const operations: Operation[] = [];
     const getString = (key: string, fallback = ''): string => {
@@ -228,7 +248,9 @@ export class SequenceGenerator {
       metadata: {
         createdAt: Date.now(),
         priority: intent.includes('urgent') ? 'high' : 'normal',
-        requiresConfirmation: operations.some(op => op.type === 'chat:send' || op.type === 'custom:trigger'),
+        requiresConfirmation: operations.some(
+          (op) => op.type === 'chat:send' || op.type === 'custom:trigger'
+        ),
       },
     };
 

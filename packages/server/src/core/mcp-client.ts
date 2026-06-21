@@ -1,4 +1,5 @@
 import type { McpServer, McpConfig, InstallMcpRequest } from '@ordpaw/shared';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client';
@@ -24,7 +25,7 @@ class McpClient {
       const result = db.exec('SELECT * FROM mcp_servers');
       if (result.length === 0) return;
       const { columns, values } = result[0];
-      for (const row of values) {
+      for (const row of values as unknown[][]) {
         const idx = (c: string) => columns.indexOf(c);
         const server: McpServer = {
           id: row[idx('id')] as string,
@@ -39,7 +40,13 @@ class McpClient {
           updatedAt: row[idx('updated_at')] as number,
         };
         this.connections.set(server.name, {
-          config: { name: server.name, transport: server.transport, command: server.command, url: server.url, env: server.env },
+          config: {
+            name: server.name,
+            transport: server.transport,
+            command: server.command,
+            url: server.url,
+            env: server.env,
+          },
           connected: false,
         });
       }
@@ -51,10 +58,14 @@ class McpClient {
 
   async installServer(req: InstallMcpRequest): Promise<McpServer> {
     if (req.transport === 'stdio' && !req.command) {
-      throw new Error('stdio transport 需要提供 command');
+      throw new OrdPawError('stdio transport 需要提供 command', {
+        code: OrdPawErrorCode.BAD_REQUEST,
+      });
     }
     if ((req.transport === 'sse' || req.transport === 'websocket') && !req.url) {
-      throw new Error(`${req.transport} transport 需要提供 url`);
+      throw new OrdPawError(`${req.transport} transport 需要提供 url`, {
+        code: OrdPawErrorCode.BAD_REQUEST,
+      });
     }
 
     const db = getDatabase();
@@ -71,17 +82,33 @@ class McpClient {
       saveDatabase();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`MCP 服务安装失败: ${msg}`);
+      throw new OrdPawError(`MCP 服务安装失败: ${msg}`, {
+        code: OrdPawErrorCode.INTERNAL_ERROR,
+        cause: err,
+      });
     }
 
     const server: McpServer = {
-      id, name: req.name, transport: req.transport,
-      command: req.command, url: req.url, env: req.env || {},
-      enabled: true, connected: false, createdAt: now, updatedAt: now,
+      id,
+      name: req.name,
+      transport: req.transport,
+      command: req.command,
+      url: req.url,
+      env: req.env || {},
+      enabled: true,
+      connected: false,
+      createdAt: now,
+      updatedAt: now,
     };
 
     this.connections.set(server.name, {
-      config: { name: server.name, transport: server.transport, command: server.command, url: server.url, env: server.env },
+      config: {
+        name: server.name,
+        transport: server.transport,
+        command: server.command,
+        url: server.url,
+        env: server.env,
+      },
       connected: false,
     });
 
@@ -97,14 +124,20 @@ class McpClient {
 
   async connectServer(id: string): Promise<McpServer> {
     const server = this.getServer(id);
-    if (!server) throw new Error(`MCP 服务不存在: ${id}`);
+    if (!server)
+      throw new OrdPawError(`MCP 服务不存在: ${id}`, { code: OrdPawErrorCode.NOT_FOUND });
 
     const conn = this.connections.get(server.name);
-    if (!conn) throw new Error(`MCP 连接不存在: ${server.name}`);
+    if (!conn)
+      throw new OrdPawError(`MCP 连接不存在: ${server.name}`, { code: OrdPawErrorCode.NOT_FOUND });
 
     // 关闭已有连接，避免重复
     if (conn.client) {
-      try { await conn.client.close(); } catch { /* ignore */ }
+      try {
+        await conn.client.close();
+      } catch {
+        /* ignore */
+      }
     }
 
     const transport = this.createTransport(conn.config);
@@ -128,11 +161,16 @@ class McpClient {
 
   async disconnectServer(id: string): Promise<McpServer> {
     const server = this.getServer(id);
-    if (!server) throw new Error(`MCP 服务不存在: ${id}`);
+    if (!server)
+      throw new OrdPawError(`MCP 服务不存在: ${id}`, { code: OrdPawErrorCode.NOT_FOUND });
 
     const conn = this.connections.get(server.name);
     if (conn?.client) {
-      try { await conn.client.close(); } catch { /* ignore */ }
+      try {
+        await conn.client.close();
+      } catch {
+        /* ignore */
+      }
       conn.client = undefined;
       conn.transport = undefined;
     }
@@ -222,10 +260,16 @@ class McpClient {
     return Array.from(this.connections.keys());
   }
 
-  async callTool(name: string, toolName: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
+  async callTool(
+    name: string,
+    toolName: string,
+    params: Record<string, unknown>
+  ): Promise<Record<string, unknown>> {
     const conn = this.connections.get(name);
     if (!conn || !conn.connected || !conn.client) {
-      throw new Error(`MCP connection not found: ${name}`);
+      throw new OrdPawError(`MCP connection not found: ${name}`, {
+        code: OrdPawErrorCode.NOT_FOUND,
+      });
     }
     const raw = await conn.client.callTool({ name: toolName, arguments: params });
     if ('content' in raw) {
@@ -234,24 +278,38 @@ class McpClient {
     return { result: raw.toolResult as unknown };
   }
 
-  private createTransport(config: McpConfig): StdioClientTransport | SSEClientTransport | WebSocketClientTransport {
+  private createTransport(
+    config: McpConfig
+  ): StdioClientTransport | SSEClientTransport | WebSocketClientTransport {
     switch (config.transport) {
       case 'stdio': {
-        if (!config.command) throw new Error('stdio transport 需要提供 command');
+        if (!config.command)
+          throw new OrdPawError('stdio transport 需要提供 command', {
+            code: OrdPawErrorCode.BAD_REQUEST,
+          });
         const parts = config.command.trim().split(/\s+/).filter(Boolean);
         const command = parts.shift()!;
         return new StdioClientTransport({ command, args: parts, env: config.env });
       }
       case 'sse': {
-        if (!config.url) throw new Error('sse transport 需要提供 url');
+        if (!config.url)
+          throw new OrdPawError('sse transport 需要提供 url', {
+            code: OrdPawErrorCode.BAD_REQUEST,
+          });
         return new SSEClientTransport(new URL(config.url));
       }
       case 'websocket': {
-        if (!config.url) throw new Error('websocket transport 需要提供 url');
+        if (!config.url)
+          throw new OrdPawError('websocket transport 需要提供 url', {
+            code: OrdPawErrorCode.BAD_REQUEST,
+          });
         return new WebSocketClientTransport(new URL(config.url));
       }
       default:
-        throw new Error(`不支持的 transport: ${(config as { transport?: string }).transport}`);
+        throw new OrdPawError(
+          `不支持的 transport: ${(config as { transport?: string }).transport}`,
+          { code: OrdPawErrorCode.BAD_REQUEST }
+        );
     }
   }
 }

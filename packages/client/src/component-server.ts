@@ -62,7 +62,10 @@ class ComponentServerImpl {
   private mounted = new Map<string, Set<HTMLElement>>();
   private currentOS: OSType = detectOS() as OSType;
   private initialized = false;
-  private mountHooks = new Map<string, (el: HTMLElement, props?: Record<string, unknown>) => void | Promise<void>>();
+  private mountHooks = new Map<
+    string,
+    (el: HTMLElement, props?: Record<string, unknown>) => void | Promise<void>
+  >();
   private unmountHooks = new Map<string, (el: HTMLElement) => void>();
   private eventListeners = new Map<string, Map<string, Set<(payload?: unknown) => void>>>();
 
@@ -80,17 +83,18 @@ class ComponentServerImpl {
   }
 
   register(contribution: ComponentContribution, plugin = 'runtime'): string {
-    const id = `${contribution.metadata?.__plugin || plugin}:${contribution.name}`;
+    const pluginName = String(contribution.metadata?.__plugin || plugin);
+    const id = `${pluginName}:${contribution.name}`;
     const node: ComponentNode = {
       id,
       name: contribution.name,
       type: (contribution.type as ComponentNode['type']) || 'component',
       src: this.normalizeSrc(contribution.src, plugin),
-      plugin: contribution.metadata?.__plugin || plugin,
+      plugin: pluginName,
       slot: contribution.slot,
       children: [],
       metadata: { ...(contribution.metadata || {}) },
-      animation: contribution.animation as ComponentAnimation | undefined
+      animation: contribution.animation as ComponentAnimation | undefined,
     };
 
     const existing = this.nodes.get(id);
@@ -110,10 +114,13 @@ class ComponentServerImpl {
   }
 
   registerMany(contributions: ComponentContribution[], plugin?: string): string[] {
-    return contributions.map(c => this.register(c, plugin));
+    return contributions.map((c) => this.register(c, plugin));
   }
 
-  registerMount(id: string, hook: (el: HTMLElement, props?: Record<string, unknown>) => void | Promise<void>): void {
+  registerMount(
+    id: string,
+    hook: (el: HTMLElement, props?: Record<string, unknown>) => void | Promise<void>
+  ): void {
     this.mountHooks.set(id, hook);
     const node = this.nodes.get(id);
     if (node) node.mountHook = hook;
@@ -141,7 +148,11 @@ class ComponentServerImpl {
       const handlers = byId.get(key);
       if (!handlers) continue;
       for (const h of handlers) {
-        try { h(payload); } catch (e) { logger.error(e, `[ComponentServer] event handler error for ${key}.${event}`); }
+        try {
+          h(payload);
+        } catch (e) {
+          logger.error(e, `[ComponentServer] event handler error for ${key}.${event}`);
+        }
       }
     }
   }
@@ -157,8 +168,10 @@ class ComponentServerImpl {
   getTreeSnapshot(): ComponentTreeSnapshot {
     return {
       nodes: Array.from(this.nodes.values()),
-      relationships: Array.from(this.relationships.entries()).flatMap(([from, list]) => list.map(to => ({ from, to }))),
-      roots: [...this.roots]
+      relationships: Array.from(this.relationships.entries()).flatMap(([from, list]) =>
+        list.map((to) => ({ from, to }))
+      ),
+      roots: [...this.roots],
     };
   }
 
@@ -249,23 +262,35 @@ class ComponentServerImpl {
 
   private osDuration(): number {
     switch (this.currentOS) {
-      case 'macos': return 380;
-      case 'ios': return 320;
-      case 'windows': return 220;
-      case 'linux': return 300;
-      case 'android': return 260;
-      default: return 300;
+      case 'macos':
+        return 380;
+      case 'ios':
+        return 320;
+      case 'windows':
+        return 220;
+      case 'linux':
+        return 300;
+      case 'android':
+        return 260;
+      default:
+        return 300;
     }
   }
 
   private osEasing(): string {
     switch (this.currentOS) {
-      case 'macos': return 'cubic-bezier(0.34, 1.56, 0.64, 1)';
-      case 'ios': return 'cubic-bezier(0.32, 0.72, 0, 1)';
-      case 'windows': return 'cubic-bezier(0.1, 0.9, 0.2, 1)';
-      case 'linux': return 'cubic-bezier(0.25, 0.1, 0.25, 1)';
-      case 'android': return 'cubic-bezier(0.4, 0, 0.2, 1)';
-      default: return 'ease-out';
+      case 'macos':
+        return 'cubic-bezier(0.34, 1.56, 0.64, 1)';
+      case 'ios':
+        return 'cubic-bezier(0.32, 0.72, 0, 1)';
+      case 'windows':
+        return 'cubic-bezier(0.1, 0.9, 0.2, 1)';
+      case 'linux':
+        return 'cubic-bezier(0.25, 0.1, 0.25, 1)';
+      case 'android':
+        return 'cubic-bezier(0.4, 0, 0.2, 1)';
+      default:
+        return 'ease-out';
     }
   }
 
@@ -319,8 +344,9 @@ class ComponentServerImpl {
 
     for (const n of nodeList) {
       if (n.slot) {
-        const parent = byName.get(`${n.plugin}:${n.slot}`) ||
-          Array.from(nodeList).find(p => p.name === n.slot && p.id !== n.id);
+        const parent =
+          byName.get(`${n.plugin}:${n.slot}`) ||
+          Array.from(nodeList).find((p) => p.name === n.slot && p.id !== n.id);
         if (parent) {
           parent.children.push(n.id);
           n.parent = parent.id;

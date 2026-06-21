@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "tsx watch src/cli.ts",
     "build": "tsc",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest"
