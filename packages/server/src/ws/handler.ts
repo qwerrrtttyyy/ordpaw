@@ -31,6 +31,30 @@ function chunkResponse(text: string): string[] {
   return chunks.length > 0 ? chunks : [text];
 }
 
+/**
+ * Group small chunks into batches up to `maxBytes` to reduce the number of
+ * WebSocket frames without losing CJK/whitespace boundaries.
+ */
+function batchChunks(chunks: string[], maxBytes: number): string[] {
+  if (chunks.length <= 1) return chunks;
+  const batches: string[] = [];
+  let current = '';
+  let currentBytes = 0;
+  for (const chunk of chunks) {
+    const chunkBytes = Buffer.byteLength(chunk, 'utf-8');
+    if (current && currentBytes + chunkBytes > maxBytes) {
+      batches.push(current);
+      current = chunk;
+      currentBytes = chunkBytes;
+    } else {
+      current += chunk;
+      currentBytes += chunkBytes;
+    }
+  }
+  if (current) batches.push(current);
+  return batches;
+}
+
 /** Per-connection subscription bookkeeping. */
 interface ClientSubscriptions {
   debugHandler: (payload: any) => void;
@@ -95,18 +119,19 @@ export function setupWebSocket(wss: WebSocketServer) {
             return;
           }
 
-          // CJK-aware chunked streaming.
+          // CJK-aware chunked streaming with pacing to avoid long-running tight loops.
           try {
             const chunks = chunkResponse(response.content);
-            for (let i = 0; i < chunks.length; i++) {
+            const batches = batchChunks(chunks, 80);
+            for (let i = 0; i < batches.length; i++) {
               if (ws.readyState !== WebSocket.OPEN) break;
-              await new Promise(resolve => setTimeout(resolve, 30));
+              await new Promise(resolve => setTimeout(resolve, 8));
               ws.send(JSON.stringify({
                 type: 'chat:stream',
                 payload: {
                   conversationId,
-                  chunk: chunks[i],
-                  done: i === chunks.length - 1
+                  chunk: batches[i],
+                  done: i === batches.length - 1
                 }
               }));
             }

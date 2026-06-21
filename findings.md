@@ -50,45 +50,29 @@
 - In-memory SQLite means no concurrent process access and DB size limited by RAM
 
 ### Code Quality Findings
-- No unit/integration tests found in repo
-- 98+ `console.log/warn/error/debug` calls across 20 files
-- TODOs in `plugin/loader.ts:56/66` and `mcp-client.ts:91`
-- Export filename still uses `agent-studio-export-${Date.now()}.json` at `api/index.ts:688` despite README claiming rename to `ordpaw-export`
-- `setupGracefulShutdown` has a 1.5s forced `process.exit` after WSS close that may race with HTTP close
+- 28 unit tests added to server package (vitest)
+- Logger wrapper introduced; core modules (loader, MCP client, skill runner) migrated away from direct `console.*`
+- Plugin loader TODOs removed; MCP client TODO replaced with real transport layer
+- Export filename uses `ordpaw-export-${Date.now()}.json`
 
 ### Potential Bugs
-- `api/index.ts:688` export filename regression (`agent-studio-export`)
-- `event-bus.ts` `off()` does not clean up empty listener Sets, causing memory growth
 - `download-service.ts` synchronous file operations on potentially large directories
-- `ws/handler.ts` streaming loop uses `await new Promise(resolve => setTimeout(resolve, 30))` which blocks message processing
-- `index.ts` `setupGracefulShutdown` registers `uncaughtException` handler that prevents process exit
+- `node:vm` script/skill sandbox is best-effort and can be escaped by determined code
 
 ---
 
 # Final Analysis Report: Ordpaw v0.0.2
 
 ## Executive Summary
-OrdPaw is a full-stack AI Agent development and debugging platform. The codebase is well-organized as a pnpm monorepo and has clearly benefited from a recent cleanup (v0.0.1 audit fixes). However, it currently **does not build end-to-end**: the client compiles, but the server TypeScript build fails with 8 errors. Security posture is weak for a multi-user deployment (no auth, default crypto secret, CORS wide open, script sandboxing is best-effort). Performance is adequate for personal use but will degrade with large conversation histories because of full-history LLM calls and unbounded list endpoints.
+OrdPaw is a full-stack AI Agent development and debugging platform. The codebase is well-organized as a pnpm monorepo using pnpm workspaces and Turborepo. After the latest round of fixes, the project **builds end-to-end**, passes type checks, and has a growing unit-test suite (28 tests). Security posture has been hardened for crypto/CORS/SQL injection, but remains weak for multi-user deployment due to missing auth and the best-effort `node:vm` sandbox. Performance is adequate for personal use but will degrade with large conversation histories because of full-history LLM calls and unbounded list endpoints.
 
 ## Build & Test Status
 | Check | Command | Result |
 |-------|---------|--------|
 | Install | `pnpm install` | ✓ Success |
-| Client type check | `cd packages/client && npx tsc --noEmit` | ✗ 3 errors |
-| Server type check | `cd packages/server && npx tsc --noEmit` | ✗ 8 errors |
-| Client build | `vite build` | ✓ Success |
-| Server build | `tsc` | ✗ Failed (8 TS errors) |
-| Tests | — | ✗ No tests found |
-
-### Type Errors Blocking Server Build
-1. `plugin/loader.ts:52` — calls `skillRunner.registerSkill(skill)`, but `SkillRunner` has no such method.
-2. `db/index.ts:1` — missing `@types/sql.js` declaration.
-3. `api/index.ts` (5 locations) — implicit `any` on `row` callback parameters.
-4. `mcp-client.ts:132` — implicit `any` on `row` callback parameter.
-
-### Client Type Errors
-1. `plugin-registry.ts:2-3` — references undefined `pluginRegistry` variable.
-2. `views/chat.ts:13` — `conversation` property not definitely assigned in constructor.
+| Type check | `pnpm turbo run typecheck` | ✓ Pass |
+| Tests | `pnpm turbo run test` | ✓ 28 tests pass |
+| Build | `pnpm turbo run build` | ✓ Pass |
 
 ## Security Assessment
 | Severity | Issue | Location | Recommendation |
@@ -113,19 +97,15 @@ OrdPaw is a full-stack AI Agent development and debugging platform. The codebase
 | 🟢 Low | TTL caches have no background eviction | `cache.ts` | Current behavior is fine; optional periodic cleanup |
 
 ## Code Quality & Maintainability
-- **No tests** — no unit, integration, or e2e tests exist.
-- **Console logging** — 98+ direct `console.*` calls; should use structured logger.
-- **Type safety** — `any` used heavily; server build fails because of it.
+- **Tests** — 28 server unit tests added (vitest).
+- **Console logging** — Logger wrapper introduced and integrated into core modules.
+- **Type safety** — Server build passes; shared plugin API types added.
 - **Mixed languages** — UI strings are mostly Chinese; consistent i18n usage is good.
-- **TODOs** remain in plugin loader and MCP client.
-- **Export filename regression** — README claims `ordpaw-export-*.json`, code still emits `agent-studio-export-*.json`.
+- **TODOs** — Plugin loader TODOs resolved; MCP client TODO replaced with real transport layer.
 
 ## Stability / Runtime Risks
-1. `setupGracefulShutdown` swallows `uncaughtException` and forces a second `process.exit`, which can race with `httpServer.close`.
-2. `eventBus.off` leaves empty `Set` objects in the listeners map.
-3. WebSocket streaming blocks the event loop for the duration of the fake throttle loop (30 ms × chunk count).
-4. Plugin loader calls a non-existent `skillRunner.registerSkill`, so any plugin registering a skill will crash at runtime.
-5. Client plugin registry references an undefined `pluginRegistry`, breaking `window.OrdPaw` initialization.
+1. `download-service.ts` uses synchronous file operations on potentially large directories.
+2. `node:vm` script/skill sandbox is best-effort and can be escaped by determined code.
 
 ## Fixes Applied (2026-06-21)
 | # | Issue | Fix | File(s) |
@@ -140,19 +120,36 @@ OrdPaw is a full-stack AI Agent development and debugging platform. The codebase
 | 8 | Dynamic SET clauses | Added `buildUpdateSet` helper with allowlist; refactored 3 managers | `db/utils.ts`, `agent-runtime.ts`, `provider-service.ts`, `test-suite.ts` |
 | 9 | Turborepo migration | Installed turbo, added `turbo.json`, `packageManager`, `typecheck` scripts, `.gitignore` | `package.json`, `turbo.json`, `packages/*/package.json`, `.gitignore` |
 
+## Feature Completion & Optimization (2026-06-21)
+| # | Area | Change | File(s) |
+|---|------|--------|---------|
+| 10 | Plugin API | Added `PluginApi`, `PluginDb`, `PluginLogger`, `Plugin` types; manifest/module/skill validation; `getSession` + per-plugin storage wired into loader | `packages/shared/src/types.ts`, `packages/server/src/plugin/validation.ts`, `packages/server/src/plugin/loader.ts`, `packages/server/src/core/plugin-storage.ts` |
+| 11 | MCP lifecycle | Implemented real transport layer for stdio/sse/websocket with timeouts, error handling, disconnect cleanup | `packages/server/src/core/mcp-transport.ts`, `packages/server/src/core/mcp-client.ts` |
+| 11 | Skill hot-reload | Added `SkillRunner.reloadSkill(id)` and local skill validation | `packages/server/src/core/skill-runner.ts` |
+| 11 | Script execution | Separated compile/runtime errors, improved timeout messages, awaited returned Promises with timeout | `packages/server/src/core/script-mcp.ts` |
+| 12 | Graceful shutdown | Removed `process.exit` from db autosave handlers; rewrote `setupGracefulShutdown` to await http/wss close, flush DB, then exit; `uncaughtException` now triggers graceful shutdown | `packages/server/src/index.ts`, `packages/server/src/db/index.ts` |
+| 12 | WS streaming | Added `batchChunks` and reduced pacing to 8ms to avoid long tight loops | `packages/server/src/ws/handler.ts` |
+| 13 | Tests | Added vitest; 28 tests covering db utils, event bus, plugin validation, skill runner, logger | `packages/server/package.json`, `turbo.json`, `packages/server/src/**/*.test.ts` |
+| 14 | Logger | Added `logger.ts` wrapper with `ORDPAW_LOG_LEVEL` support; integrated into loader, MCP client, skill runner | `packages/server/src/core/logger.ts` |
+
+## Build & Test Status (after optimization)
+| Check | Command | Result |
+|-------|---------|--------|
+| Type check | `pnpm turbo run typecheck` | ✓ Pass |
+| Tests | `pnpm turbo run test` | ✓ 28 tests pass |
+| Build | `pnpm turbo run build` | ✓ Pass |
+
 ## Remaining Work (not addressed)
 - **Authentication/authorization** — still no user/session gate.
 - **Script sandbox hardening** — `node:vm` remains best-effort; true isolation needs worker process refactor.
 - **Performance limits** — conversation history cap, pagination, export streaming still not implemented.
-- **Tests** — no unit/integration tests yet.
-- **Graceful shutdown race** — `uncaughtException` handler still prevents crash exit.
 
 ## Prioritized Action Plan
 1. ~~**Fix server build**~~ ✓
 2. ~~**Fix client build**~~ ✓
 3. ~~**Remove default crypto secret**~~ ✓
 4. ~~**Harden CORS & dynamic SQL**~~ ✓
-5. **Add tests** — start with core services (session, checkpoint, provider-service) and API smoke tests.
+5. ~~**Add core tests**~~ ✓
 6. **Add authentication** — even a simple token/session gate would raise the bar.
 7. **Cap conversation history** — biggest user-facing latency win.
 8. **Add pagination** — prevents accidental OOM on large datasets.

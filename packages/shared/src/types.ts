@@ -158,6 +158,43 @@ export interface PluginInstance {
   state: 'loaded' | 'error' | 'disabled';
 }
 
+// === 插件 API ===
+export interface PluginLogger {
+  info: (...args: any[]) => void;
+  debug: (...args: any[]) => void;
+  warn: (...args: any[]) => void;
+  error: (...args: any[]) => void;
+}
+
+export interface PluginStorageEntry {
+  key: string;
+  value: any;
+  updatedAt: number;
+}
+
+export interface PluginDb {
+  get(key: string): any | undefined;
+  set(key: string, value: any): void;
+  delete(key: string): boolean;
+  list(): PluginStorageEntry[];
+  clear(): void;
+}
+
+export interface PluginApi {
+  logger: PluginLogger;
+  config: Record<string, any>;
+  registerSkill(skill: SkillDefinition): void;
+  getSession(id: string): Conversation | null;
+  emit(event: string, data: any): void;
+  registerComponent(contribution: ComponentContribution): void;
+  db: PluginDb;
+}
+
+export interface Plugin {
+  onLoad?(api: PluginApi): void | Promise<void>;
+  handlers?: Record<string, EventCallback>;
+}
+
 // === 事件总线 ===
 export type EventCallback = (payload: any) => void | Promise<void>;
 

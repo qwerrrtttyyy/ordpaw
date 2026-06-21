@@ -71,6 +71,55 @@ Complete
 - [x] Deliver final summary to user
 - **Status:** complete
 
+### Phase 10: Plugin API Completion
+- [x] Implement `getSession` for plugin API
+- [x] Implement plugin private DB storage (`plugin_storage` table + API)
+- [x] Add plugin API types and validation
+- **Status:** complete
+
+### Phase 11: Agent Core Capabilities (MCP / Skill / Script)
+- [x] Review and fix MCP connection lifecycle (stdio/sse/websocket)
+- [x] Improve skill loading error handling and hot-reload support
+- [x] Harden script execution error handling and timeouts
+- **Status:** complete
+
+### Phase 12: Stability & Graceful Shutdown
+- [x] Fix `uncaughtException` to trigger graceful shutdown
+- [x] Fix WebSocket streaming throttle to avoid event-loop blocking
+- [x] Fix graceful shutdown race between `httpServer.close` and forced `process.exit`
+- **Status:** complete
+
+### Phase 13: Test Framework & Core Tests
+- [x] Add vitest test framework to server package
+- [x] Add tests for db utils, plugin API, event bus
+- [x] Add tests for agent-runtime / skill-runner core paths
+- **Status:** complete
+
+### Phase 14: Code Quality Optimization
+- [x] Add minimal logger wrapper to reduce direct `console.*` usage
+- [x] Tighten types in core modules
+- [x] Unify error handling patterns
+- **Status:** complete
+
+### Phase 15: Final Verification
+- [x] Run `turbo run typecheck`
+- [x] Run new test suite
+- [x] Run `turbo run build`
+- [x] Update findings.md and deliver summary
+- **Status:** complete
+
+## Current Phase
+Phase 15 (complete)
+
+## Errors Encountered
+| Error | Attempt | Resolution |
+|-------|---------|------------|
+| Server build fails (8 TS errors) | 1 | Added sql.js types, typed callbacks, implemented registerSkill |
+| Client build fails (3 TS errors) | 1 | Implemented PluginRegistry, fixed ChatView assignment |
+| Turbo missing `packageManager` | 1 | Added `packageManager`: `pnpm@10.28.1` |
+| Turbo 2.x `pipeline` → `tasks` | 1 | Renamed key in turbo.json |
+| pnpm frozen-lockfile blocks vitest install | 1 | Ran `pnpm install --no-frozen-lockfile` in CI |
+
 ## Key Questions — Answered
 1. **What is Ordpaw?** Full-stack AI Agent development/debugging platform.
 2. **Architecture?** pnpm + Turborepo monorepo: Vite vanilla TS SPA client + Express/WebSocket server + sql.js SQLite.

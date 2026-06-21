@@ -201,6 +201,14 @@ export async function initDatabase(): Promise<Database> {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS plugin_storage (
+      plugin_name TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (plugin_name, key)
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_checkpoints_conv ON checkpoints(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_agent ON conversations(agent_id);
@@ -276,7 +284,7 @@ export function getDatabase(): Database {
 }
 
 /**
- * 在进程退出前保存
+ * 在进程退出前保存（不调用 process.exit，避免与上层优雅关闭逻辑冲突）
  */
 function setupAutoSave() {
   const cleanup = () => {
@@ -286,14 +294,6 @@ function setupAutoSave() {
   };
   process.on('beforeExit', cleanup);
   process.on('exit', cleanup);
-  process.on('SIGINT', () => {
-    cleanup();
-    process.exit(0);
-  });
-  process.on('SIGTERM', () => {
-    cleanup();
-    process.exit(0);
-  });
 }
 
 setupAutoSave();

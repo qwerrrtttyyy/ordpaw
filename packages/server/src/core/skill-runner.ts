@@ -2,6 +2,9 @@ import type { SkillDefinition, SkillContext, InstalledSkill, SkillInstallResult,
 import { v4 as uuidv4 } from 'uuid';
 import vm from 'vm';
 import { getDatabase, saveDatabase } from '../db/index.js';
+import { createLogger } from './logger.js';
+
+const skillLogger = createLogger('skill');
 
 class SkillRunner {
   private skills: Map<string, SkillDefinition> = new Map();
@@ -28,7 +31,7 @@ class SkillRunner {
 
     // Load persisted user skills
     this.loadInstalledFromDb();
-    console.log(`✓ SkillRunner 已初始化 (${this.skills.size} 个技能)`);
+    skillLogger.info(`已初始化 (${this.skills.size} 个技能)`);
   }
 
   private registerBuiltin(name: string, description: string, parameters: any, execute: (params: any) => Promise<any>): void {
@@ -53,7 +56,7 @@ class SkillRunner {
         this.registerInstalled(obj);
       }
     } catch (err) {
-      console.warn('加载已安装技能失败:', err);
+      skillLogger.warn('加载已安装技能失败:', err);
     }
   }
 
@@ -211,10 +214,35 @@ class SkillRunner {
    * 注册插件贡献的技能
    */
   registerSkill(skill: SkillDefinition): void {
-    if (!skill || !skill.id || !skill.name || typeof skill.execute !== 'function') {
+    if (!this.isValidSkill(skill)) {
       throw new Error('技能定义无效：必须包含 id、name 和 execute 函数');
     }
     this.skills.set(skill.id, skill);
+  }
+
+  private isValidSkill(skill: unknown): skill is SkillDefinition {
+    if (!skill || typeof skill !== 'object') return false;
+    const s = skill as Record<string, unknown>;
+    return typeof s.id === 'string' && !!s.id && typeof s.name === 'string' && !!s.name && typeof s.execute === 'function';
+  }
+
+  /**
+   * 热重载已安装技能（按 id）
+   */
+  async reloadSkill(id: string): Promise<SkillDefinition | null> {
+    const meta = this.installedMeta.get(id);
+    if (!meta) {
+      throw new Error(`技能不存在: ${id}`);
+    }
+    if (meta.source === 'builtin') {
+      throw new Error('内置技能无法重载');
+    }
+    try {
+      this.registerInstalled(meta);
+      return this.skills.get(id) || null;
+    } catch (err: any) {
+      throw new Error(`技能重载失败: ${err.message}`);
+    }
   }
 
   private safeJsonParse(val: any, def: any): any {

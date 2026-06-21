@@ -5,7 +5,7 @@ import { WebSocketServer } from 'ws';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
-import { initDatabase } from './db/index.js';
+import { initDatabase, flushDatabaseSync } from './db/index.js';
 import { setupApiRoutes } from './api/index.js';
 import { setupWebSocket } from './ws/handler.js';
 import { loadPlugins } from './plugin/loader.js';
@@ -131,50 +131,59 @@ async function start() {
 }
 
 function setupGracefulShutdown(httpServer: any, wss: WebSocketServer) {
-  const shutdown = (signal: string) => {
-    console.log(`\n收到 ${signal} 信号，开始优雅关闭...`);
+  let shuttingDown = false;
 
-    let forced = false;
+  const shutdown = async (signal: string, error?: Error) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+
+    if (error) {
+      console.error(`\n未捕获异常，触发优雅关闭:`, error);
+    } else {
+      console.log(`\n收到 ${signal} 信号，开始优雅关闭...`);
+    }
+
     const forceTimer = setTimeout(() => {
-      forced = true;
       console.error('关闭超时（10s），强制退出');
       process.exit(1);
     }, 10000);
 
-    // 停止接收新连接
-    httpServer.close((err: any) => {
-      if (err && !forced) {
-        console.error('HTTP server 关闭出错:', err);
+    try {
+      // 关闭所有 WebSocket 客户端连接
+      for (const client of wss.clients) {
+        try {
+          client.close(1001, 'Server shutting down');
+        } catch {
+          // ignore
+        }
       }
+
+      // 等待 HTTP/WebSocket server 关闭
+      await Promise.all([
+        new Promise<void>((resolve, reject) => {
+          httpServer.close((err: any) => (err ? reject(err) : resolve()));
+        }),
+        new Promise<void>((resolve) => wss.close(() => resolve()))
+      ]);
+
+      // 强制落库
+      flushDatabaseSync();
+
       clearTimeout(forceTimer);
-      console.log('✓ HTTP server 已关闭');
-    });
-
-    // 关闭所有 WebSocket 连接
-    wss.clients.forEach((client) => {
-      try {
-        client.close(1001, 'Server shutting down');
-      } catch (e) {
-        // 忽略
-      }
-    });
-    wss.close(() => {
-      console.log('✓ WebSocket server 已关闭');
-    });
-
-    // 给一点时间完成清理
-    setTimeout(() => {
-      console.log('👋 进程退出');
-      process.exit(0);
-    }, 1500);
+      console.log('✓ 优雅关闭完成');
+      process.exit(error ? 1 : 0);
+    } catch (err) {
+      clearTimeout(forceTimer);
+      console.error('优雅关闭失败:', err);
+      process.exit(1);
+    }
   };
 
   process.on('SIGINT', () => shutdown('SIGINT'));
   process.on('SIGTERM', () => shutdown('SIGTERM'));
 
   process.on('uncaughtException', (err) => {
-    console.error('未捕获的异常:', err);
-    // 不退出进程，记录日志
+    shutdown('uncaughtException', err).catch(() => process.exit(1));
   });
 
   process.on('unhandledRejection', (reason, promise) => {

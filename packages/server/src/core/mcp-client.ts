@@ -2,9 +2,13 @@ import type { McpServer, McpConfig, InstallMcpRequest } from '@ordpaw/shared';
 import { v4 as uuidv4 } from 'uuid';
 import type { SqlValue } from 'sql.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
+import { createTransport, type McpTransport } from './mcp-transport.js';
+import { createLogger } from './logger.js';
+
+const mcpLogger = createLogger('mcp');
 
 class McpClient {
-  private connections: Map<string, { config: McpConfig; connected: boolean }> = new Map();
+  private connections: Map<string, { server: McpServer; transport: McpTransport }> = new Map();
 
   init(): void {
     try {
@@ -22,18 +26,16 @@ class McpClient {
           url: row[idx('url')] as string | undefined,
           env: this.safeJsonParse(row[idx('env_json')], {}),
           enabled: row[idx('enabled')] === 1,
-          connected: false, // Start disconnected
+          connected: false,
           createdAt: row[idx('created_at')] as number,
           updatedAt: row[idx('updated_at')] as number,
         };
-        this.connections.set(server.name, {
-          config: { name: server.name, transport: server.transport, command: server.command, url: server.url, env: server.env },
-          connected: false,
-        });
+        const config = this.toConfig(server);
+        this.connections.set(server.name, { server, transport: createTransport(config) });
       }
-      console.log(`✓ MCPClient 已初始化 (${this.connections.size} 个服务)`);
+      mcpLogger.info(`已初始化 (${this.connections.size} 个服务)`);
     } catch (err) {
-      console.warn('加载 MCP 服务失败:', err);
+      mcpLogger.warn('加载 MCP 服务失败:', err);
     }
   }
 
@@ -67,16 +69,13 @@ class McpClient {
       enabled: true, connected: false, createdAt: now, updatedAt: now,
     };
 
-    this.connections.set(server.name, {
-      config: { name: server.name, transport: server.transport, command: server.command, url: server.url, env: server.env },
-      connected: false,
-    });
+    const config = this.toConfig(server);
+    this.connections.set(server.name, { server, transport: createTransport(config) });
 
-    // Best-effort auto-connect
     try {
       await this.connectServer(id);
     } catch {
-      // Non-fatal
+      // Non-fatal: server is installed but not connected
     }
 
     return server;
@@ -89,15 +88,19 @@ class McpClient {
     const conn = this.connections.get(server.name);
     if (!conn) throw new Error(`MCP 连接不存在: ${server.name}`);
 
-    // TODO: Implement real MCP transport connection
-    console.log(`MCP 连接 ${server.name} (${server.transport})`);
-    conn.connected = true;
+    if (conn.transport.connected) {
+      return { ...server, connected: true };
+    }
 
-    const db = getDatabase();
-    db.run('UPDATE mcp_servers SET connected = 1, updated_at = ? WHERE id = ?', [Date.now(), id]);
-    saveDatabase();
-
-    return { ...server, connected: true, updatedAt: Date.now() };
+    try {
+      await conn.transport.connect();
+      this.updateServerConnectionState(id, true);
+      mcpLogger.info(`已连接 ${server.name} (${server.transport})`);
+      return { ...this.getServer(id)!, connected: true };
+    } catch (err: any) {
+      this.updateServerConnectionState(id, false);
+      throw new Error(`MCP 连接失败 ${server.name}: ${err.message}`);
+    }
   }
 
   async disconnectServer(id: string): Promise<McpServer> {
@@ -105,20 +108,28 @@ class McpClient {
     if (!server) throw new Error(`MCP 服务不存在: ${id}`);
 
     const conn = this.connections.get(server.name);
-    if (conn) conn.connected = false;
+    if (conn) {
+      try {
+        await conn.transport.disconnect();
+      } catch (err) {
+        mcpLogger.warn(`断开连接时出错 ${server.name}:`, err);
+      }
+    }
 
-    const db = getDatabase();
-    db.run('UPDATE mcp_servers SET connected = 0, updated_at = ? WHERE id = ?', [Date.now(), id]);
-    saveDatabase();
-
-    return { ...server, connected: false, updatedAt: Date.now() };
+    this.updateServerConnectionState(id, false);
+    return { ...this.getServer(id)!, connected: false };
   }
 
   uninstallServer(id: string): boolean {
     const server = this.getServer(id);
     if (!server) return false;
 
-    this.connections.delete(server.name);
+    const conn = this.connections.get(server.name);
+    if (conn) {
+      conn.transport.disconnect().catch(() => {});
+      this.connections.delete(server.name);
+    }
+
     const db = getDatabase();
     db.run('DELETE FROM mcp_servers WHERE id = ?', [id]);
     saveDatabase();
@@ -171,28 +182,66 @@ class McpClient {
 
   // Legacy API kept for backward compatibility
   async connect(config: McpConfig): Promise<void> {
-    this.connections.set(config.name, { config, connected: true });
+    const transport = createTransport(config);
+    await transport.connect();
+    this.connections.set(config.name, { server: this.configToServer(config), transport });
   }
 
   async disconnect(name: string): Promise<void> {
-    this.connections.delete(name);
+    const conn = this.connections.get(name);
+    if (conn) {
+      await conn.transport.disconnect();
+      this.connections.delete(name);
+    }
   }
 
   isConnected(name: string): boolean {
-    return this.connections.get(name)?.connected || false;
+    return this.connections.get(name)?.transport.connected || false;
   }
 
   listConnections(): string[] {
-    return Array.from(this.connections.keys());
+    return Array.from(this.connections.entries())
+      .filter(([, conn]) => conn.transport.connected)
+      .map(([name]) => name);
   }
 
   async callTool(name: string, toolName: string, params: any): Promise<any> {
     const conn = this.connections.get(name);
-    if (!conn || !conn.connected) {
-      throw new Error(`MCP connection not found: ${name}`);
+    if (!conn || !conn.transport.connected) {
+      throw new Error(`MCP connection not found or not connected: ${name}`);
     }
-    console.log(`MCP 调用工具 ${toolName} on ${name}`, params);
-    return { result: `Tool ${toolName} executed` };
+    return conn.transport.callTool(toolName, params);
+  }
+
+  private toConfig(server: McpServer): McpConfig {
+    return {
+      name: server.name,
+      transport: server.transport,
+      command: server.command,
+      url: server.url,
+      env: server.env,
+    };
+  }
+
+  private configToServer(config: McpConfig): McpServer {
+    return {
+      id: '',
+      name: config.name,
+      transport: config.transport,
+      command: config.command,
+      url: config.url,
+      env: config.env || {},
+      enabled: true,
+      connected: true,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+  }
+
+  private updateServerConnectionState(id: string, connected: boolean): void {
+    const db = getDatabase();
+    db.run('UPDATE mcp_servers SET connected = ?, updated_at = ? WHERE id = ?', [connected ? 1 : 0, Date.now(), id]);
+    saveDatabase();
   }
 
   private safeJsonParse(val: any, def: any): any {

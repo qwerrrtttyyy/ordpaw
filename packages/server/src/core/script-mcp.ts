@@ -315,10 +315,39 @@ export class ScriptMcp {
    * 4. console.log/warn/error captured into the logs array.
    */
   private runInSandbox(code: string, args: Record<string, any>, context: Record<string, any>, logs: string[]): any {
-    // Wrap user code in an IIFE so `return ...` works.
-    // The vm context provides all standard JS globals (Math, JSON, Date, etc.)
-    // automatically — we only need to inject our helpers.
-    //
+    const wrapped = this.wrapCode(code);
+
+    const sandbox = this.buildSandbox(args, context, logs);
+    const contextObj = vm.createContext(sandbox);
+
+    let scriptObj: vm.Script;
+    try {
+      scriptObj = new vm.Script(wrapped, { filename: 'ordpaw-script.js' });
+    } catch (err: any) {
+      throw new Error(`脚本编译错误: ${err.message}`);
+    }
+
+    try {
+      const result = scriptObj.runInContext(contextObj, {
+        timeout: SCRIPT_TIMEOUT_MS,
+        breakOnSigint: true,
+        displayErrors: true
+      });
+
+      // If the script returns a Promise, wait for it with the same timeout.
+      if (result && typeof result === 'object' && typeof (result as PromiseLike<unknown>).then === 'function') {
+        return this.awaitWithTimeout(result as Promise<unknown>);
+      }
+      return result;
+    } catch (err: any) {
+      if (err && err.message && /Script execution timed out/i.test(err.message)) {
+        throw new Error(`脚本执行超时（>${SCRIPT_TIMEOUT_MS}ms）`);
+      }
+      throw new Error(`脚本执行错误: ${err.message}`);
+    }
+  }
+
+  private wrapCode(code: string): string {
     // Backward-compat: the preset scripts (hello-world, calculator) end with
     // `main($args);` — they call main() but don't `return` the result. To
     // preserve the old `eval`-based behavior where the last expression's
@@ -329,7 +358,7 @@ export class ScriptMcp {
     const definesMain = /\bfunction\s+main\s*\(/.test(code) || /\bconst\s+main\s*=/.test(code) || /\blet\s+main\s*=/.test(code);
     const trailer = (!hasReturnStmt && definesMain) ? '\nreturn main($args);' : '';
 
-    const wrapped = `(function() {
+    return `(function() {
       "use strict";
       var console = {
         log: function() { var a = Array.prototype.slice.call(arguments); a.forEach(function(x) { __logs.push(String(x)); }); return a[a.length-1]; },
@@ -343,18 +372,13 @@ export class ScriptMcp {
       var $ctx = context;
       return (function() { ${code}${trailer} })();
     })();`;
+  }
 
-    // Build a context with only safe primitives. vm.createContext will
-    // automatically provide the standard JS globals (Object, Array, Math,
-    // JSON, Date, etc.) on the context object; we just augment with our
-    // helpers. Critically, process / require / global / module are NOT
-    // exposed, so user code cannot escape to Node primitives.
-    const sandbox: Record<string, any> = {
+  private buildSandbox(args: Record<string, any>, context: Record<string, any>, logs: string[]): Record<string, any> {
+    return {
       __logs: logs,
       __args: args,
       __context: context,
-      // Explicitly provide the safe standard globals so user code can rely
-      // on them even if a future vm version stops auto-exposing them.
       Math,
       JSON,
       Date,
@@ -375,17 +399,17 @@ export class ScriptMcp {
       encodeURIComponent,
       decodeURIComponent
     };
+  }
 
-    const contextObj = vm.createContext(sandbox);
-    const scriptObj = new vm.Script(wrapped, { filename: 'ordpaw-script.js' });
-
-    // runInContext supports a `timeout` option that aborts infinite loops.
-    const result = scriptObj.runInContext(contextObj, {
-      timeout: SCRIPT_TIMEOUT_MS,
-      breakOnSigint: true
+  private async awaitWithTimeout(promise: Promise<unknown>): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error(`异步脚本执行超时（>${SCRIPT_TIMEOUT_MS}ms）`));
+      }, SCRIPT_TIMEOUT_MS);
+      promise
+        .then((value) => { clearTimeout(timer); resolve(value); })
+        .catch((err) => { clearTimeout(timer); reject(err); });
     });
-
-    return result;
   }
 
   private rowToScript(row: any): Script {

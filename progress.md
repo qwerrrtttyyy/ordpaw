@@ -153,11 +153,38 @@
 | 2026-06-21 | Turbo requires `packageManager` field | 1 | Added `packageManager`: `pnpm@10.28.1` |
 | 2026-06-21 | Turbo 2.x uses `tasks` not `pipeline` | 1 | Renamed key in turbo.json |
 
+### Phase 10–15: Feature Completion & Optimization
+- **Status:** in_progress
+- Actions taken:
+  - User requested: 补全功能；增加优化
+  - Clarified scope: plugin API completion, MCP/skill/script core capabilities, graceful shutdown, tests, code quality
+  - Updated task_plan.md with Phases 10–15
+- Files created/modified:
+  - task_plan.md (updated)
+  - progress.md (updated)
+
+## Test Results
+| Test | Input | Expected | Actual | Status |
+|------|-------|----------|--------|--------|
+| Client type check | `cd packages/client && npx tsc --noEmit` | Clean compile | Clean | ✓ |
+| Server type check | `cd packages/server && npx tsc --noEmit` | Clean compile | Clean | ✓ |
+| Turbo typecheck | `npx turbo run typecheck` | All pass | 2 successful | ✓ |
+| Turbo build | `npx turbo run build` | All pass | 4 successful | ✓ |
+| Test suite | — | Exists | None found | ✗ |
+
+## Error Log
+| Timestamp | Error | Attempt | Resolution |
+|-----------|-------|---------|------------|
+| 2026-06-21 | Server build fails (8 TS errors) | 1 | Fixed with type declarations and typed callbacks |
+| 2026-06-21 | Client build fails (3 TS errors) | 1 | Fixed PluginRegistry and ChatView initialization |
+| 2026-06-21 | Turbo missing `packageManager` | 1 | Added `packageManager`: `pnpm@10.28.1` |
+| 2026-06-21 | Turbo 2.x uses `tasks` not `pipeline` | 1 | Renamed key in turbo.json |
+
 ## 5-Question Reboot Check
 | Question | Answer |
 |----------|--------|
-| Where am I? | Phase 9 complete |
-| Where am I going? | Handoff to user |
-| What's the goal? | Fix all critical issues and introduce Turborepo |
-| What have I learned? | Build, security, runtime, and Turborepo setup all verified |
-| What have I done? | Completed all fix phases; both typecheck and build pass |
+| Where am I? | Phase 10 in_progress |
+| Where am I going? | Phases 10–15 |
+| What's the goal? | Complete plugin API, agent core capabilities, stability, tests, and code quality |
+| What have I learned? | See findings.md final report |
+| What have I done? | Planned new phases; about to implement plugin API and core fixes |
