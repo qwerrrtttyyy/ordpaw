@@ -1,0 +1,90 @@
+/* OS-Specific Effects */
+
+:root {
+  --os-blur-intensity: 12px;
+  --os-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --os-animation-curve: ease-out;
+  --os-border-radius: 8px;
+}
+
+/* macOS Effects */
+[data-os="macos"] .sidebar {
+  backdrop-filter: blur(var(--os-blur-intensity));
+  background: rgba(255, 255, 255, 0.7);
+}
+
+[data-os="macos"] .card {
+  border-radius: var(--os-border-radius);
+  box-shadow: var(--os-shadow-soft);
+  transition: all 0.4s var(--os-animation-curve);
+}
+
+[data-os="macos"] .card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+[data-os="macos"] .btn {
+  border-radius: var(--os-border-radius);
+  transition: all 0.4s var(--os-animation-curve);
+}
+
+[data-os="macos"] .btn:hover {
+  transform: scale(1.02);
+}
+
+/* Windows Effects */
+[data-os="windows"] .sidebar {
+  background: #f3f3f3;
+  border-right: 1px solid #e1e1e1;
+}
+
+[data-os="windows"] .card {
+  border-radius: var(--os-border-radius);
+  border: 1px solid #e1e1e1;
+  box-shadow: var(--os-shadow-soft);
+  transition: all 0.25s var(--os-animation-curve);
+}
+
+[data-os="windows"] .card:hover {
+  border-color: #0078d4;
+  box-shadow: 0 4px 16px rgba(0, 120, 212, 0.2);
+}
+
+[data-os="windows"] .btn {
+  border-radius: var(--os-border-radius);
+  transition: all 0.25s var(--os-animation-curve);
+}
+
+[data-os="windows"] .btn:hover {
+  background: #0078d4;
+  color: white;
+}
+
+/* Linux Effects */
+[data-os="linux"] .sidebar {
+  background: #2c2c2c;
+  border-right: 1px solid #3c3c3c;
+}
+
+[data-os="linux"] .card {
+  border-radius: var(--os-border-radius);
+  border: 1px solid #3c3c3c;
+  box-shadow: var(--os-shadow-soft);
+  transition: all 0.3s var(--os-animation-curve);
+}
+
+[data-os="linux"] .card:hover {
+  border-color: #00ff00;
+  box-shadow: 0 6px 24px rgba(0, 255, 0, 0.15);
+}
+
+[data-os="linux"] .btn {
+  border-radius: var(--os-border-radius);
+  transition: all 0.3s var(--os-animation-curve);
+}
+
+[data-os="linux"] .btn:hover {
+  background: #00ff00;
+  color: #000;
+}

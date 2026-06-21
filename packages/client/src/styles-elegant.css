@@ -1,0 +1,431 @@
+/* Elegant UI Enhancements */
+
+/* Refined Color Palette */
+:root {
+  --elegant-bg-primary: #fafbfc;
+  --elegant-bg-secondary: #f5f6f8;
+  --elegant-bg-tertiary: #ebedf0;
+  --elegant-text-primary: #1a1d23;
+  --elegant-text-secondary: #5f6368;
+  --elegant-text-tertiary: #9aa0a6;
+
+  --elegant-accent-primary: #4a90e2;
+  --elegant-accent-secondary: #7c3aed;
+  --elegant-accent-success: #10b981;
+  --elegant-accent-warning: #f59e0b;
+  --elegant-accent-danger: #ef4444;
+
+  --elegant-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --elegant-gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+  --elegant-gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+
+  --elegant-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --elegant-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --elegant-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+  --elegant-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
+
+  --elegant-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --elegant-transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  --elegant-transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Elegant Card Design */
+.elegant-card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: var(--elegant-shadow-md);
+  transition: all var(--elegant-transition-normal);
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.elegant-card:hover {
+  box-shadow: var(--elegant-shadow-lg);
+  transform: translateY(-2px);
+}
+
+.elegant-card-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--elegant-bg-tertiary);
+  background: var(--elegant-bg-primary);
+}
+
+.elegant-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--elegant-text-primary);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.01em;
+}
+
+.elegant-card-subtitle {
+  font-size: 14px;
+  color: var(--elegant-text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.elegant-card-body {
+  padding: 24px;
+}
+
+/* Refined Buttons */
+.elegant-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 500;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all var(--elegant-transition-fast);
+  text-decoration: none;
+  line-height: 1.5;
+}
+
+.elegant-btn-primary {
+  background: var(--elegant-gradient-primary);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.elegant-btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
+}
+
+.elegant-btn-secondary {
+  background: white;
+  color: var(--elegant-text-primary);
+  border: 1px solid var(--elegant-bg-tertiary);
+  box-shadow: var(--elegant-shadow-sm);
+}
+
+.elegant-btn-secondary:hover {
+  background: var(--elegant-bg-primary);
+  border-color: var(--elegant-accent-primary);
+  color: var(--elegant-accent-primary);
+}
+
+.elegant-btn-ghost {
+  background: transparent;
+  color: var(--elegant-text-secondary);
+}
+
+.elegant-btn-ghost:hover {
+  background: var(--elegant-bg-secondary);
+  color: var(--elegant-text-primary);
+}
+
+/* Elegant Input Fields */
+.elegant-input {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 14px;
+  border: 1px solid var(--elegant-bg-tertiary);
+  border-radius: 10px;
+  background: white;
+  color: var(--elegant-text-primary);
+  transition: all var(--elegant-transition-fast);
+}
+
+.elegant-input:focus {
+  outline: none;
+  border-color: var(--elegant-accent-primary);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+}
+
+.elegant-input::placeholder {
+  color: var(--elegant-text-tertiary);
+}
+
+/* Elegant Labels */
+.elegant-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--elegant-text-secondary);
+  margin-bottom: 6px;
+  letter-spacing: 0.01em;
+}
+
+/* Elegant Badges */
+.elegant-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.elegant-badge-primary {
+  background: rgba(74, 144, 226, 0.1);
+  color: var(--elegant-accent-primary);
+}
+
+.elegant-badge-success {
+  background: rgba(16, 185, 129, 0.1);
+  color: var(--elegant-accent-success);
+}
+
+.elegant-badge-warning {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--elegant-accent-warning);
+}
+
+.elegant-badge-danger {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--elegant-accent-danger);
+}
+
+/* Elegant Lists */
+.elegant-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.elegant-list-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--elegant-bg-tertiary);
+  transition: background var(--elegant-transition-fast);
+}
+
+.elegant-list-item:hover {
+  background: var(--elegant-bg-primary);
+}
+
+.elegant-list-item:last-child {
+  border-bottom: none;
+}
+
+/* Elegant Typography */
+.elegant-heading-1 {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--elegant-text-primary);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin: 0 0 16px 0;
+}
+
+.elegant-heading-2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--elegant-text-primary);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+  margin: 0 0 12px 0;
+}
+
+.elegant-heading-3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--elegant-text-primary);
+  letter-spacing: -0.005em;
+  line-height: 1.4;
+  margin: 0 0 8px 0;
+}
+
+.elegant-text {
+  font-size: 14px;
+  color: var(--elegant-text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.elegant-text-small {
+  font-size: 12px;
+  color: var(--elegant-text-tertiary);
+  line-height: 1.5;
+}
+
+/* Elegant Dividers */
+.elegant-divider {
+  height: 1px;
+  background: var(--elegant-bg-tertiary);
+  margin: 24px 0;
+  border: none;
+}
+
+/* Elegant Loading States */
+.elegant-skeleton {
+  background: linear-gradient(90deg, var(--elegant-bg-secondary) 25%, var(--elegant-bg-tertiary) 50%, var(--elegant-bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: elegant-shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+@keyframes elegant-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Elegant Tooltips */
+.elegant-tooltip {
+  position: relative;
+  display: inline-block;
+}
+
+.elegant-tooltip::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 8px 12px;
+  background: var(--elegant-text-primary);
+  color: white;
+  font-size: 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--elegant-transition-fast);
+  z-index: 1000;
+}
+
+.elegant-tooltip:hover::after {
+  opacity: 1;
+}
+
+/* Elegant Grid Layout */
+.elegant-grid {
+  display: grid;
+  gap: 24px;
+}
+
+.elegant-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.elegant-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.elegant-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .elegant-grid-4 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .elegant-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .elegant-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .elegant-grid-2 {
+    grid-template-columns: 1fr;
+  }
+  .elegant-grid-3 {
+    grid-template-columns: 1fr;
+  }
+  .elegant-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Elegant Animations */
+@keyframes elegant-fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes elegant-slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.elegant-animate-fadeIn {
+  animation: elegant-fadeIn var(--elegant-transition-normal) ease-out;
+}
+
+.elegant-animate-slideIn {
+  animation: elegant-slideIn var(--elegant-transition-normal) ease-out;
+}
+
+/* Elegant Focus States */
+.elegant-focusable:focus {
+  outline: 2px solid var(--elegant-accent-primary);
+  outline-offset: 2px;
+}
+
+/* Elegant Scrollbar */
+.elegant-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-track {
+  background: var(--elegant-bg-secondary);
+  border-radius: 4px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--elegant-text-tertiary);
+  border-radius: 4px;
+}
+
+.elegant-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--elegant-text-secondary);
+}
+
+/* Elegant Empty State */
+.elegant-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.elegant-empty-icon {
+  font-size: 48px;
+  color: var(--elegant-text-tertiary);
+  margin-bottom: 16px;
+}
+
+.elegant-empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--elegant-text-primary);
+  margin: 0 0 8px 0;
+}
+
+.elegant-empty-text {
+  font-size: 14px;
+  color: var(--elegant-text-secondary);
+  margin: 0 0 24px 0;
+  max-width: 400px;
+}
