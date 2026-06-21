@@ -1,0 +1,321 @@
+/* OS-Specific Effects */
+
+:root {
+  --os-blur-intensity: 12px;
+  --os-shadow-soft: 0 4px 20px rgba(0, 0, 0, 0.1);
+  --os-animation-curve: ease-out;
+  --os-border-radius: 8px;
+}
+
+/* macOS Effects */
+[data-os="macos"] .sidebar {
+  backdrop-filter: blur(var(--os-blur-intensity));
+  background: rgba(255, 255, 255, 0.7);
+}
+
+[data-os="macos"] .card {
+  border-radius: var(--os-border-radius);
+  box-shadow: var(--os-shadow-soft);
+  transition: all 0.4s var(--os-animation-curve);
+}
+
+[data-os="macos"] .card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+[data-os="macos"] .btn {
+  border-radius: var(--os-border-radius);
+  transition: all 0.4s var(--os-animation-curve);
+}
+
+[data-os="macos"] .btn:hover {
+  transform: scale(1.02);
+}
+
+/* Windows Effects */
+[data-os="windows"] .sidebar {
+  background: #f3f3f3;
+  border-right: 1px solid #e1e1e1;
+}
+
+[data-os="windows"] .card {
+  border-radius: var(--os-border-radius);
+  border: 1px solid #e1e1e1;
+  box-shadow: var(--os-shadow-soft);
+  transition: all 0.25s var(--os-animation-curve);
+}
+
+[data-os="windows"] .card:hover {
+  border-color: #0078d4;
+  box-shadow: 0 4px 16px rgba(0, 120, 212, 0.2);
+}
+
+[data-os="windows"] .btn {
+  border-radius: var(--os-border-radius);
+  transition: all 0.25s var(--os-animation-curve);
+}
+
+[data-os="windows"] .btn:hover {
+  background: #0078d4;
+  color: white;
+}
+
+/* Linux Effects */
+[data-os="linux"] .sidebar {
+  background: #2c2c2c;
+  border-right: 1px solid #3c3c3c;
+}
+
+[data-os="linux"] .card {
+  border-radius: var(--os-border-radius);
+  border: 1px solid #3c3c3c;
+  box-shadow: var(--os-shadow-soft);
+  transition: all 0.3s var(--os-animation-curve);
+}
+
+[data-os="linux"] .card:hover {
+  border-color: #00ff00;
+  box-shadow: 0 6px 24px rgba(0, 255, 0, 0.15);
+}
+
+[data-os="linux"] .btn {
+  border-radius: var(--os-border-radius);
+  transition: all 0.3s var(--os-animation-curve);
+}
+
+[data-os="linux"] .btn:hover {
+  background: #00ff00;
+  color: #000;
+}
+
+/* Elegant UI Enhancements */
+
+/* Glassmorphism Effects */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Gradient Borders */
+.gradient-border {
+  position: relative;
+  background: white;
+  border-radius: 12px;
+}
+
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  padding: 2px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Smooth Transitions */
+.smooth-transition {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Hover Lift Effect */
+.hover-lift {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+/* Pulse Animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Shimmer Effect */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg, #f0f0f0 0%, #e0e0e0 50%, #f0f0f0 100%);
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Component Tree View */
+
+.component-tree-view {
+  padding: 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.view-header {
+  margin-bottom: 24px;
+}
+
+.view-header h2 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.view-subtitle {
+  font-size: 14px;
+  color: var(--text-secondary, #6b7280);
+  margin: 0;
+}
+
+.component-tree-controls {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.component-tree-content {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  overflow: hidden;
+}
+
+.tree-visualization {
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 24px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tree-visualization svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.tree-details {
+  background: var(--bg-secondary, #f9fafb);
+  border-radius: 12px;
+  padding: 24px;
+  overflow: auto;
+}
+
+.details-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-secondary, #6b7280);
+  font-size: 14px;
+}
+
+.node-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.node-details h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: var(--text-primary, #1a1a1a);
+}
+
+.detail-value.code {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  background: var(--bg-tertiary, #e5e7eb);
+  padding: 8px 12px;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.error-message {
+  color: #ef4444;
+  font-size: 14px;
+  text-align: center;
+  padding: 24px;
+}
+
+/* Tree Node Styles */
+.tree-node {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tree-node:hover rect {
+  filter: brightness(1.1);
+}
+
+.tree-node:hover text {
+  font-weight: 600;
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+  .component-tree-content {
+    grid-template-columns: 1fr;
+  }
+
+  .tree-details {
+    max-height: 400px;
+  }
+}
+
+@media (max-width: 768px) {
+  .component-tree-view {
+    padding: 16px;
+  }
+
+  .component-tree-controls {
+    flex-direction: column;
+  }
+
+  .view-header h2 {
+    font-size: 20px;
+  }
+}
