@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import * as utils from './utils';
+import * as utils from '../utils';
 
 const { detectOS, applyOSEffects, getOSAnimationDuration, debounce, throttle, transitionTheme } = utils;
 

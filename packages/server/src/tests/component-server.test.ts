@@ -13,7 +13,7 @@ describe('ComponentServer', () => {
   });
 
   it('should build component tree from contributions', async () => {
-    const mod = await import('./component-server.js');
+    const mod = await import('../core/component-server.js');
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
@@ -29,7 +29,7 @@ describe('ComponentServer', () => {
   });
 
   it('should deduplicate by plugin name', async () => {
-    const mod = await import('./component-server.js');
+    const mod = await import('../core/component-server.js');
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
@@ -45,7 +45,7 @@ describe('ComponentServer', () => {
   });
 
   it('should normalize relative src paths', async () => {
-    const mod = await import('./component-server.js');
+    const mod = await import('../core/component-server.js');
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
@@ -59,7 +59,7 @@ describe('ComponentServer', () => {
   });
 
   it('should preserve absolute URLs', async () => {
-    const mod = await import('./component-server.js');
+    const mod = await import('../core/component-server.js');
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
