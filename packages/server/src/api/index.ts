@@ -12,7 +12,7 @@ import { testSuiteManager } from '../core/test-suite.js';
 import { debugLogger } from '../core/debug-logger.js';
 import { statsCache } from '../core/cache.js';
 import { componentServer } from '../core/component-server.js';
-import { getDatabase, saveDatabase } from '../db/index.js';
+import { getDatabase, saveDatabase, listBackups, createBackup, restoreBackup, deleteBackup, getDataPaths } from '../db/index.js';
 import { setupDownloadRoutes } from '../core/download-service.js';
 import { asyncHandler, ApiError, validateBody } from '../middleware.js';
 import { queryAll, queryOne, rowToObject, safeJsonParse, safeCount as dbSafeCount } from '../db/utils.js';
@@ -566,6 +566,40 @@ export function setupApiRoutes(app: any) {
   }), asyncHandler(async (req: Request, res: Response) => {
     const result = await scriptMcp.callTool({ tool: req.body.tool, params: req.body.params });
     res.json(result);
+  }));
+
+  // ============ 备份与恢复 API ============
+  router.get('/backups', asyncHandler(async (_req: Request, res: Response) => {
+    res.json(listBackups());
+  }));
+
+  router.post('/backups', asyncHandler(async (req: Request, res: Response) => {
+    const { label, maxKeep } = req.body || {};
+    const entry = createBackup({
+      label: typeof label === 'string' ? label : undefined,
+      maxKeep: typeof maxKeep === 'number' ? maxKeep : 10,
+    });
+    res.status(201).json(entry);
+  }));
+
+  router.post('/backups/:filename/restore', asyncHandler(async (req: Request, res: Response) => {
+    const result = restoreBackup(req.params.filename);
+    res.json(result);
+  }));
+
+  router.delete('/backups/:filename', asyncHandler(async (req: Request, res: Response) => {
+    const ok = deleteBackup(req.params.filename);
+    if (!ok) throw ApiError.notFound('备份不存在');
+    res.json({ success: true });
+  }));
+
+  router.get('/data-paths', asyncHandler(async (_req: Request, res: Response) => {
+    const paths = getDataPaths();
+    res.json({
+      dataDir: paths.dataDir,
+      dbPath: paths.dbPath,
+      backupDir: paths.backupDir,
+    });
   }));
 
   // ============ 统计 API ============
