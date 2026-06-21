@@ -13,8 +13,9 @@ class DebugLogger {
 
   constructor() {
     // 订阅所有事件总线事件
-    eventBus.on('*', (payload: any) => {
-      const type = payload?.__eventMeta?.type || 'unknown';
+    eventBus.on('*', (payload: unknown) => {
+      const meta = (payload as Record<string, unknown> | undefined)?.__eventMeta as Record<string, unknown> | undefined;
+      const type = typeof meta?.type === 'string' ? meta.type : 'unknown';
       this.pushEvent(type, payload);
     });
   }
@@ -27,7 +28,7 @@ class DebugLogger {
     return this.debugMode;
   }
 
-  log(level: DebugLogEntry['level'], message: string, source?: string, metadata?: Record<string, any>) {
+  log(level: DebugLogEntry['level'], message: string, source?: string, metadata?: Record<string, unknown>) {
     const entry: DebugLogEntry = {
       id: Math.random().toString(36).slice(2, 10),
       time: Date.now(),
@@ -41,7 +42,7 @@ class DebugLogger {
     this.listeners.forEach(fn => fn(entry));
   }
 
-  pushEvent(type: string, payload: any) {
+  pushEvent(type: string, payload: unknown) {
     const entry: DebugEventEntry = {
       id: Math.random().toString(36).slice(2, 10),
       time: Date.now(),

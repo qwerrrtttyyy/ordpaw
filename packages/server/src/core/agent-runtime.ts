@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Agent, Message, Provider } from '@ordpaw/shared';
+import type { Agent, Message, Provider, McpConfig } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { sessionManager } from './session.js';
 import { checkpointManager } from './checkpoint.js';
@@ -8,6 +8,7 @@ import { debugLogger } from './debug-logger.js';
 import { providerService } from './provider-service.js';
 import { agentCache } from './cache.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
 
 /**
  * Resolve the effective API key for a provider.
@@ -68,10 +69,10 @@ async function callOpenAICompatible(opts: {
       debugLogger.log('error', `OpenAI-compatible call failed: ${res.status} ${text.slice(0, 200)}`, 'agent-runtime');
       return null;
     }
-    const data: any = await res.json();
+    const data = await res.json() as { choices?: Array<{ message?: { content?: string } }> };
     return data?.choices?.[0]?.message?.content ?? '';
-  } catch (err: any) {
-    debugLogger.log('error', `OpenAI-compatible fetch error: ${err.message}`, 'agent-runtime');
+  } catch (err: unknown) {
+    debugLogger.log('error', `OpenAI-compatible fetch error: ${err instanceof Error ? err.message : String(err)}`, 'agent-runtime');
     return null;
   }
 }
@@ -109,10 +110,10 @@ async function callAnthropic(opts: {
       debugLogger.log('error', `Anthropic call failed: ${res.status} ${text.slice(0, 200)}`, 'agent-runtime');
       return null;
     }
-    const data: any = await res.json();
-    return data?.content?.map((c: any) => c.text).join('') ?? '';
-  } catch (err: any) {
-    debugLogger.log('error', `Anthropic fetch error: ${err.message}`, 'agent-runtime');
+    const data = await res.json() as { content?: Array<{ text?: string }> };
+    return data?.content?.map(c => c.text).join('') ?? '';
+  } catch (err: unknown) {
+    debugLogger.log('error', `Anthropic fetch error: ${err instanceof Error ? err.message : String(err)}`, 'agent-runtime');
     return null;
   }
 }
@@ -195,7 +196,7 @@ export class AgentRuntime {
     try {
       checkpointManager.createCheckpoint(conversationId, assistantMsg.id, 'Auto checkpoint');
     } catch (err) {
-      console.error('自动检查点创建失败:', err);
+      logger.error(err, '自动检查点创建失败:');
     }
 
     return assistantMsg;
@@ -207,7 +208,7 @@ export class AgentRuntime {
 
     try {
       const db = getDatabase();
-      const agent = queryOne<any>(db, 'SELECT * FROM agents WHERE id = ?', [id]);
+      const agent = queryOne<AgentRow>(db, 'SELECT * FROM agents WHERE id = ?', [id]);
       if (!agent) return null;
 
       const parsed: Agent = {
@@ -217,20 +218,20 @@ export class AgentRuntime {
         systemPrompt: agent.system_prompt,
         providerId: agent.provider_id || 'openai',
         model: agent.model,
-        skills: safeJsonParse(agent.skills_json, []),
-        mcpServers: safeJsonParse(agent.mcp_json, []),
+        skills: safeJsonParse<string[]>(agent.skills_json, []),
+        mcpServers: safeJsonParse<McpConfig[]>(agent.mcp_json, []),
         createdAt: agent.created_at,
         updatedAt: agent.updated_at
       };
       agentCache.set(id, parsed);
       return parsed;
     } catch (err) {
-      console.error('getAgent 错误:', err);
+      logger.error(err, 'getAgent 错误:');
       return null;
     }
   }
 
-  createAgent(data: { name: string; description?: string; systemPrompt?: string; providerId?: string; model?: string; skills?: string[]; mcpServers?: any[] }): Agent {
+  createAgent(data: { name: string; description?: string; systemPrompt?: string; providerId?: string; model?: string; skills?: string[]; mcpServers?: McpConfig[] }): Agent {
     const db = getDatabase();
     const now = Date.now();
     const id = uuidv4();
@@ -254,7 +255,7 @@ export class AgentRuntime {
   listAgents(): Agent[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<any>(db, 'SELECT * FROM agents ORDER BY updated_at DESC');
+      const rows = queryAll<AgentRow>(db, 'SELECT * FROM agents ORDER BY updated_at DESC');
       return rows.map(agent => ({
         id: agent.id,
         name: agent.name,
@@ -262,13 +263,13 @@ export class AgentRuntime {
         systemPrompt: agent.system_prompt,
         providerId: agent.provider_id || 'openai',
         model: agent.model,
-        skills: safeJsonParse(agent.skills_json, []),
-        mcpServers: safeJsonParse(agent.mcp_json, []),
+        skills: safeJsonParse<string[]>(agent.skills_json, []),
+        mcpServers: safeJsonParse<McpConfig[]>(agent.mcp_json, []),
         createdAt: agent.created_at,
         updatedAt: agent.updated_at
       }));
     } catch (err) {
-      console.error('listAgents 错误:', err);
+      logger.error(err, 'listAgents 错误:');
       return [];
     }
   }
@@ -279,7 +280,7 @@ export class AgentRuntime {
 
     const db = getDatabase();
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -332,10 +333,23 @@ export class AgentRuntime {
       agentCache.delete(id);
       return true;
     } catch (err) {
-      console.error('deleteAgent 错误:', err);
+      logger.error(err, 'deleteAgent 错误:');
       return false;
     }
   }
+}
+
+interface AgentRow {
+  id: string;
+  name: string;
+  description: string;
+  system_prompt: string;
+  provider_id: string;
+  model: string;
+  skills_json: string;
+  mcp_json: string;
+  created_at: number;
+  updated_at: number;
 }
 
 export const agentRuntime = new AgentRuntime();

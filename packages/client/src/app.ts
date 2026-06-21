@@ -26,6 +26,7 @@ import { SequenceExecutor } from './sequence-executor';
 import { DownloadManager } from './download-manager';
 import { installGlobalPluginApi } from './plugin-registry';
 import { detectOS, applyOSEffects } from './utils';
+import { logger } from './logger';
 
 export class App {
   private router: Router;
@@ -124,7 +125,7 @@ export class App {
     try {
       await loadPluginComponents();
     } catch (err) {
-      console.error('重载插件组件失败:', err);
+      logger.error(err, '重载插件组件失败');
     }
   }
 
@@ -140,22 +141,22 @@ export class App {
       this.ws = new WebSocket(wsUrl);
 
       this.ws.onopen = () => {
-        console.log('[App] WebSocket 已连接');
-        window.__ordpaw = { ws: this.ws!, version: '0.0.3', OrdPaw: (window as any).OrdPaw };
+        logger.info('[App] WebSocket 已连接');
+        window.__ordpaw = { ws: this.ws!, version: '0.0.3', OrdPaw: window.OrdPaw };
         this.sequenceExecutor = new SequenceExecutor(this.router, this.store);
         this.sequenceExecutor.connect(this.ws!);
       };
 
       this.ws.onclose = () => {
-        console.log('[App] WebSocket 已断开，5秒后重连...');
+        logger.info('[App] WebSocket 已断开，5秒后重连...');
         setTimeout(() => this.initWebSocket(), 5000);
       };
 
       this.ws.onerror = (error) => {
-        console.error('[App] WebSocket 错误:', error);
+        logger.error(error, '[App] WebSocket 错误');
       };
     } catch (error) {
-      console.error('[App] WebSocket 初始化失败:', error);
+      logger.error(error, '[App] WebSocket 初始化失败');
     }
   }
 
@@ -205,7 +206,7 @@ export class App {
         setLocale(settings.locale);
       }
     } catch (error) {
-      console.error('加载设置失败:', error);
+      logger.error(error, '加载设置失败');
     }
   }
 
@@ -216,7 +217,7 @@ export class App {
       this.mobileDrawer.setStats(stats);
       this.bottomNav.setCounts(stats);
     } catch (error) {
-      console.error('加载统计失败:', error);
+      logger.error(error, '加载统计失败');
     }
   }
 
@@ -379,7 +380,7 @@ export class App {
     };
     const meta = routeMap[this.currentRoute];
     if (meta) {
-      this.renderView(meta.view, meta.title, meta.crumbs).catch(console.error);
+      this.renderView(meta.view, meta.title, meta.crumbs).catch(err => logger.error(err, '视图渲染失败'));
     }
   }
 
@@ -508,7 +509,7 @@ export class App {
     try {
       await chatView.init(content);
     } catch (err) {
-      console.error('Chat 视图渲染失败:', err);
+      logger.error(err, 'Chat 视图渲染失败');
       content.innerHTML = `<div class="empty-state"><p>加载对话失败</p></div>`;
     }
   }
@@ -532,7 +533,7 @@ export class App {
     try {
       await renderFn();
     } catch (error) {
-      console.error('视图渲染失败:', error);
+      logger.error(error, '视图渲染失败');
       this.contentEl.innerHTML = `
         <div class="empty-state">
           <div class="empty-state-icon">⚠</div>

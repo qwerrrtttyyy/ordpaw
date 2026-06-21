@@ -2,6 +2,19 @@ import type { SkillDefinition, SkillContext, InstalledSkill, SkillInstallResult,
 import { v4 as uuidv4 } from 'uuid';
 import vm from 'vm';
 import { getDatabase, saveDatabase } from '../db/index.js';
+import { logger } from './logger.js';
+
+interface SkillRow {
+  id: string;
+  name: string;
+  description: string;
+  parameters_json: string;
+  code: string;
+  source: 'builtin' | 'user';
+  enabled: number;
+  created_at: number;
+  updated_at: number;
+}
 
 class SkillRunner {
   private skills: Map<string, SkillDefinition> = new Map();
@@ -20,7 +33,7 @@ class SkillRunner {
       type: 'object',
       properties: { message: { type: 'string' } },
       required: ['message'],
-    }, async (params) => ({ echo: params.message }));
+    }, async (params: Record<string, unknown>) => ({ echo: params.message }));
 
     this.registerBuiltin('time', '获取当前时间', {
       type: 'object', properties: {},
@@ -28,10 +41,10 @@ class SkillRunner {
 
     // Load persisted user skills
     this.loadInstalledFromDb();
-    console.log(`✓ SkillRunner 已初始化 (${this.skills.size} 个技能)`);
+    logger.info(`SkillRunner 已初始化 (${this.skills.size} 个技能)`);
   }
 
-  private registerBuiltin(name: string, description: string, parameters: any, execute: (params: any) => Promise<any>): void {
+  private registerBuiltin(name: string, description: string, parameters: Record<string, unknown>, execute: (params: Record<string, unknown>) => Promise<Record<string, unknown>>): void {
     const id = `builtin-${name}`;
     this.skills.set(id, { id, name, description, parameters, execute });
     this.installedMeta.set(id, {
@@ -48,22 +61,22 @@ class SkillRunner {
       if (result.length === 0) return;
       const { columns, values } = result[0];
       for (const row of values) {
-        const obj = this.rowToMeta(columns, row);
+        const obj = this.rowToMeta(columns, row as unknown[]);
         this.installedMeta.set(obj.id, obj);
         this.registerInstalled(obj);
       }
     } catch (err) {
-      console.warn('加载已安装技能失败:', err);
+      logger.warn({ err }, '加载已安装技能失败');
     }
   }
 
-  private rowToMeta(columns: string[], row: any[]): InstalledSkill {
+  private rowToMeta(columns: string[], row: unknown[]): InstalledSkill {
     const idx = (c: string) => columns.indexOf(c);
     return {
       id: row[idx('id')] as string,
       name: row[idx('name')] as string,
       description: row[idx('description')] as string,
-      parameters: this.safeJsonParse(row[idx('parameters_json')], {}),
+      parameters: safeJsonParse(row[idx('parameters_json')], {}),
       code: row[idx('code')] as string,
       source: row[idx('source')] as 'builtin' | 'user',
       enabled: row[idx('enabled')] === 1,
@@ -72,16 +85,16 @@ class SkillRunner {
     };
   }
 
-  registerSkill(skill: { id: string; name: string; description: string; parameters: any; execute: (params: any) => Promise<any> }): void {
+  registerSkill(skill: SkillDefinition): void {
     // 插件通过 registerSkill 注册的技能，作为用户技能处理
     this.skills.set(skill.id, skill);
-    console.log(`✓ 技能 ${skill.name} 已注册`);
+    logger.info(`技能 ${skill.name} 已注册`);
   }
 
   registerInstalled(meta: InstalledSkill): void {
-    const sandbox: Record<string, any> = {};
+    const sandbox: Record<string, unknown> = {};
     for (const g of SkillRunner.ALLOWED_GLOBALS) {
-      sandbox[g] = (globalThis as any)[g];
+      sandbox[g] = (globalThis as Record<string, unknown>)[g];
     }
     sandbox.__args = null;
 
@@ -100,20 +113,21 @@ class SkillRunner {
     const ctx = vm.createContext(sandbox);
     const script = new vm.Script(wrapped, { filename: `skill-${meta.name}.js` });
 
-    const execute = async (params: any, _context: SkillContext): Promise<any> => {
+    const execute = async (params: unknown, _context: SkillContext): Promise<unknown> => {
       sandbox.__args = params;
-      sandbox.__log = (...a: any[]) => logs.push(a.map(String).join(' '));
-      sandbox.__warn = (...a: any[]) => logs.push('WARN: ' + a.map(String).join(' '));
-      sandbox.__error = (...a: any[]) => logs.push('ERROR: ' + a.map(String).join(' '));
       const logs: string[] = [];
+      sandbox.__log = (...a: unknown[]) => logs.push(a.map(String).join(' '));
+      sandbox.__warn = (...a: unknown[]) => logs.push('WARN: ' + a.map(String).join(' '));
+      sandbox.__error = (...a: unknown[]) => logs.push('ERROR: ' + a.map(String).join(' '));
       try {
         const result = script.runInContext(ctx, {
           timeout: SkillRunner.SKILL_TIMEOUT_MS,
           breakOnSigint: true,
         });
         return { result, logs };
-      } catch (err: any) {
-        throw new Error(`技能执行错误: ${err.message}`);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`技能执行错误: ${msg}`);
       }
     };
 
@@ -137,8 +151,9 @@ class SkillRunner {
     // Validate code by attempting to compile it
     try {
       new vm.Script(`(function() { ${req.code} })()`, { filename: 'validate.js' });
-    } catch (err: any) {
-      throw new Error(`技能代码验证失败: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`技能代码验证失败: ${msg}`);
     }
 
     try {
@@ -148,8 +163,9 @@ class SkillRunner {
         [id, req.name, req.description || '', paramsJson, req.code, source, now, now]
       );
       saveDatabase();
-    } catch (err: any) {
-      throw new Error(`技能安装失败: ${err.message}`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`技能安装失败: ${msg}`);
     }
 
     const meta: InstalledSkill = {
@@ -161,18 +177,19 @@ class SkillRunner {
 
     try {
       this.registerInstalled(meta);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback
       db.run('DELETE FROM installed_skills WHERE id = ?', [id]);
       saveDatabase();
       this.installedMeta.delete(id);
-      throw new Error(`技能注册失败，已回滚: ${err.message}`);
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`技能注册失败，已回滚: ${msg}`);
     }
 
     return { id, name: req.name, description: req.description || '', source };
   }
 
-  async executeSkill(id: string, params: any, context: SkillContext): Promise<SkillExecuteResult> {
+  async executeSkill(id: string, params: unknown, context: SkillContext): Promise<SkillExecuteResult> {
     const skill = this.skills.get(id);
     if (!skill) {
       return { success: false, error: `技能不存在: ${id}` };
@@ -180,8 +197,9 @@ class SkillRunner {
     try {
       const output = await skill.execute(params, context);
       return { success: true, output };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { success: false, error: msg };
     }
   }
 
@@ -212,10 +230,15 @@ class SkillRunner {
   getSkill(id: string): SkillDefinition | undefined {
     return this.skills.get(id);
   }
+}
 
-  private safeJsonParse(val: any, def: any): any {
-    if (!val) return def;
-    try { return JSON.parse(val); } catch { return def; }
+function safeJsonParse(value: unknown, fallback: Record<string, unknown>): Record<string, unknown> {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value !== 'string') return value as Record<string, unknown>;
+  try {
+    return JSON.parse(value) as Record<string, unknown>;
+  } catch {
+    return fallback;
   }
 }
 

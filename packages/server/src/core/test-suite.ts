@@ -4,17 +4,49 @@ import { getDatabase, saveDatabase } from '../db/index.js';
 import { agentRuntime } from './agent-runtime.js';
 import { sessionManager } from './session.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
+
+interface SuiteRow {
+  id: string;
+  agent_id: string;
+  name: string;
+  description: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface CaseRow {
+  id: string;
+  suite_id: string;
+  name: string;
+  input: string;
+  expected_output: string;
+  expected_contains_json: string;
+  variables_json: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface RunRow {
+  id: string;
+  suite_id: string;
+  agent_id: string;
+  results_json: string;
+  passed: number;
+  failed: number;
+  created_at: number;
+}
 
 export class TestSuiteManager {
   listSuites(agentId?: string): TestSuite[] {
     try {
       const db = getDatabase();
       const rows = agentId
-        ? queryAll<any>(db, 'SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
-        : queryAll<any>(db, 'SELECT * FROM test_suites ORDER BY updated_at DESC');
+        ? queryAll<SuiteRow>(db, 'SELECT * FROM test_suites WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
+        : queryAll<SuiteRow>(db, 'SELECT * FROM test_suites ORDER BY updated_at DESC');
       return rows.map(row => this.rowToSuite(row));
     } catch (err) {
-      console.error('listSuites 错误:', err);
+      logger.error(err, 'listSuites 错误:');
       return [];
     }
   }
@@ -22,10 +54,10 @@ export class TestSuiteManager {
   getSuite(id: string): TestSuite | null {
     try {
       const db = getDatabase();
-      const row = queryOne<any>(db, 'SELECT * FROM test_suites WHERE id = ?', [id]);
+      const row = queryOne<SuiteRow>(db, 'SELECT * FROM test_suites WHERE id = ?', [id]);
       return row ? this.rowToSuite(row) : null;
     } catch (err) {
-      console.error('getSuite 错误:', err);
+      logger.error(err, 'getSuite 错误:');
       return null;
     }
   }
@@ -58,7 +90,7 @@ export class TestSuiteManager {
 
     const db = getDatabase();
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -89,7 +121,7 @@ export class TestSuiteManager {
       saveDatabase();
       return true;
     } catch (err) {
-      console.error('deleteSuite 错误:', err);
+      logger.error(err, 'deleteSuite 错误:');
       return false;
     }
   }
@@ -108,7 +140,7 @@ export class TestSuiteManager {
 
     const db = getDatabase();
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -151,7 +183,7 @@ export class TestSuiteManager {
       saveDatabase();
       return true;
     } catch (err) {
-      console.error('deleteCase 错误:', err);
+      logger.error(err, 'deleteCase 错误:');
       return false;
     }
   }
@@ -180,8 +212,8 @@ export class TestSuiteManager {
         sessionManager.deleteConversation(tempConv.id);
 
         ok = this.evaluateCase(testCase, output);
-      } catch (err: any) {
-        error = err?.message || String(err);
+      } catch (err: unknown) {
+        error = err instanceof Error ? err.message : String(err);
         output = error || '';
       }
       const duration = Date.now() - start;
@@ -212,18 +244,18 @@ export class TestSuiteManager {
   listRuns(suiteId: string): TestRun[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<any>(db, 'SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC', [suiteId]);
+      const rows = queryAll<RunRow>(db, 'SELECT * FROM test_runs WHERE suite_id = ? ORDER BY created_at DESC', [suiteId]);
       return rows.map(r => ({
         id: r.id,
         suiteId: r.suite_id,
         agentId: r.agent_id,
-        results: safeJsonParse(r.results_json, []),
+        results: safeJsonParse<TestRunResult[]>(r.results_json, []),
         passed: r.passed,
         failed: r.failed,
         createdAt: r.created_at
       }));
     } catch (err) {
-      console.error('listRuns 错误:', err);
+      logger.error(err, 'listRuns 错误:');
       return [];
     }
   }
@@ -279,15 +311,15 @@ export class TestSuiteManager {
   private getCase(id: string): TestCase | null {
     try {
       const db = getDatabase();
-      const row = queryOne<any>(db, 'SELECT * FROM test_cases WHERE id = ?', [id]);
+      const row = queryOne<CaseRow>(db, 'SELECT * FROM test_cases WHERE id = ?', [id]);
       return row ? this.rowToCase(row) : null;
     } catch (err) {
-      console.error('getCase 错误:', err);
+      logger.error(err, 'getCase 错误:');
       return null;
     }
   }
 
-  private rowToSuite(s: any): TestSuite {
+  private rowToSuite(s: SuiteRow): TestSuite {
     return {
       id: s.id,
       agentId: s.agent_id,
@@ -302,23 +334,23 @@ export class TestSuiteManager {
   private getSuiteCases(suiteId: string): TestCase[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<any>(db, 'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC', [suiteId]);
+      const rows = queryAll<CaseRow>(db, 'SELECT * FROM test_cases WHERE suite_id = ? ORDER BY created_at ASC', [suiteId]);
       return rows.map(row => this.rowToCase(row));
     } catch (err) {
-      console.error('getSuiteCases 错误:', err);
+      logger.error(err, 'getSuiteCases 错误:');
       return [];
     }
   }
 
-  private rowToCase(c: any): TestCase {
+  private rowToCase(c: CaseRow): TestCase {
     return {
       id: c.id,
       suiteId: c.suite_id,
       name: c.name,
       input: c.input,
       expectedOutput: c.expected_output,
-      expectedContains: safeJsonParse(c.expected_contains_json, []),
-      variables: safeJsonParse(c.variables_json, {}),
+      expectedContains: safeJsonParse<string[]>(c.expected_contains_json, []),
+      variables: safeJsonParse<Record<string, unknown>>(c.variables_json, {}),
       createdAt: c.created_at,
       updatedAt: c.updated_at
     };

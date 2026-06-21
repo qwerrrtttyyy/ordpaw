@@ -137,4 +137,75 @@ describe('ComponentLoader', () => {
     const tree = await loader.loadComponentTree();
     expect(tree).toBeNull();
   });
+
+  it('should load plugin components from manifest', async () => {
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: async () => [
+        { name: 'style', type: 'css', src: '/style.css', metadata: { __plugin: 'p' } },
+        { name: 'script', type: 'script', src: '/script.js', metadata: { __plugin: 'p' } }
+      ]
+    });
+
+    // Mock script loading
+    const originalCreateElement = document.createElement;
+    const mockScript = document.createElement('script');
+    Object.defineProperty(mockScript, 'onload', {
+      set(fn) { setTimeout(fn, 0); },
+      configurable: true
+    });
+    document.createElement = vi.fn((tag: string) => {
+      if (tag === 'script') return mockScript;
+      return originalCreateElement.call(document, tag);
+    }) as any;
+
+    const loader = await import('../component-loader');
+    const result = await loader.loadPluginComponents();
+    expect(result.length).toBe(2);
+
+    document.createElement = originalCreateElement;
+  });
+
+  it('should handle manifest fetch errors', async () => {
+    (global.fetch as any).mockRejectedValue(new Error('network'));
+    const loader = await import('../component-loader');
+    const result = await loader.loadPluginComponents();
+    expect(result).toEqual([]);
+  });
+
+  it('should reload plugin components', async () => {
+    const loader = await import('../component-loader');
+    loader.registerRuntimeComponent({
+      name: 'reloadable',
+      type: 'component',
+      src: 'reload.js',
+      metadata: { __plugin: 'runtime' }
+    } as ComponentContribution);
+
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: async () => []
+    });
+
+    const result = await loader.reloadPluginComponents();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('should overwrite existing runtime component', async () => {
+    const loader = await import('../component-loader');
+    loader.registerRuntimeComponent({
+      name: 'dup',
+      type: 'component',
+      src: 'dup.js',
+      metadata: { __plugin: 'runtime' }
+    } as ComponentContribution);
+    loader.registerRuntimeComponent({
+      name: 'dup',
+      type: 'component',
+      src: 'dup2.js',
+      metadata: { __plugin: 'runtime' }
+    } as ComponentContribution);
+    const comp = loader.getComponentById('runtime:dup');
+    expect(comp?.src).toBe('dup2.js');
+  });
 });

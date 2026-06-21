@@ -5,6 +5,8 @@ import { Client } from '@modelcontextprotocol/sdk/client';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
 import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
+import { logger } from './logger.js';
+import { safeJsonParse } from '../db/utils.js';
 
 interface ActiveConnection {
   config: McpConfig;
@@ -30,7 +32,7 @@ class McpClient {
           transport: row[idx('transport')] as McpServer['transport'],
           command: row[idx('command')] as string | undefined,
           url: row[idx('url')] as string | undefined,
-          env: this.safeJsonParse(row[idx('env_json')], {}),
+          env: safeJsonParse(row[idx('env_json')], {}),
           enabled: row[idx('enabled')] === 1,
           connected: false, // 初始化为未连接，避免进程未启动时误判
           createdAt: row[idx('created_at')] as number,
@@ -41,9 +43,9 @@ class McpClient {
           connected: false,
         });
       }
-      console.log(`✓ MCPClient 已初始化 (${this.connections.size} 个服务)`);
+      logger.info(`MCPClient 已初始化 (${this.connections.size} 个服务)`);
     } catch (err) {
-      console.warn('加载 MCP 服务失败:', err);
+      logger.warn({ err }, '加载 MCP 服务失败');
     }
   }
 
@@ -164,7 +166,7 @@ class McpClient {
     const result = db.exec('SELECT * FROM mcp_servers ORDER BY created_at DESC');
     if (result.length === 0) return [];
     const { columns, values } = result[0];
-    return values.map((row: any[]) => {
+    return values.map((row: unknown[]) => {
       const idx = (c: string) => columns.indexOf(c);
       return {
         id: row[idx('id')] as string,
@@ -172,7 +174,7 @@ class McpClient {
         transport: row[idx('transport')] as McpServer['transport'],
         command: row[idx('command')] as string | undefined,
         url: row[idx('url')] as string | undefined,
-        env: this.safeJsonParse(row[idx('env_json')], {}),
+        env: safeJsonParse(row[idx('env_json')], {}),
         enabled: row[idx('enabled')] === 1,
         connected: row[idx('connected')] === 1,
         createdAt: row[idx('created_at')] as number,
@@ -195,7 +197,7 @@ class McpClient {
       transport: row[idx('transport')] as McpServer['transport'],
       command: row[idx('command')] as string | undefined,
       url: row[idx('url')] as string | undefined,
-      env: this.safeJsonParse(row[idx('env_json')], {}),
+      env: safeJsonParse(row[idx('env_json')], {}),
       enabled: row[idx('enabled')] === 1,
       connected: row[idx('connected')] === 1,
       createdAt: row[idx('created_at')] as number,
@@ -220,16 +222,16 @@ class McpClient {
     return Array.from(this.connections.keys());
   }
 
-  async callTool(name: string, toolName: string, params: any): Promise<any> {
+  async callTool(name: string, toolName: string, params: Record<string, unknown>): Promise<Record<string, unknown>> {
     const conn = this.connections.get(name);
     if (!conn || !conn.connected || !conn.client) {
       throw new Error(`MCP connection not found: ${name}`);
     }
     const raw = await conn.client.callTool({ name: toolName, arguments: params });
     if ('content' in raw) {
-      return { result: raw.content };
+      return { result: raw.content as unknown };
     }
-    return { result: raw.toolResult };
+    return { result: raw.toolResult as unknown };
   }
 
   private createTransport(config: McpConfig): StdioClientTransport | SSEClientTransport | WebSocketClientTransport {
@@ -249,13 +251,8 @@ class McpClient {
         return new WebSocketClientTransport(new URL(config.url));
       }
       default:
-        throw new Error(`不支持的 transport: ${(config as any).transport}`);
+        throw new Error(`不支持的 transport: ${(config as { transport?: string }).transport}`);
     }
-  }
-
-  private safeJsonParse(val: any, def: any): any {
-    if (!val) return def;
-    try { return JSON.parse(val); } catch { return def; }
   }
 }
 

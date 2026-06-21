@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { agentRuntime } from '../core/agent-runtime.js';
 import { eventBus } from '../core/event-bus.js';
+import { logger } from '../core/logger.js';
 
 /**
  * Split a string into stream chunks that respect both ASCII word boundaries
@@ -33,9 +34,9 @@ function chunkResponse(text: string): string[] {
 
 /** Per-connection subscription bookkeeping. */
 interface ClientSubscriptions {
-  debugHandler: (payload: any) => void;
-  eventHandler: (payload: any) => void;
-  checkpointHandler: (payload: any) => void;
+  debugHandler: (payload: unknown) => void;
+  eventHandler: (payload: unknown) => void;
+  checkpointHandler: (payload: unknown) => void;
 }
 
 export function setupWebSocket(wss: WebSocketServer) {
@@ -45,19 +46,19 @@ export function setupWebSocket(wss: WebSocketServer) {
   const subscriptions = new WeakMap<WebSocket, ClientSubscriptions>();
 
   wss.on('connection', (ws: WebSocket) => {
-    console.log('🔌 WebSocket 客户端已连接');
+    logger.info('🔌 WebSocket 客户端已连接');
 
-    const debugHandler = (payload: any) => {
+    const debugHandler = (payload: unknown) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'debug:log', payload }));
       }
     };
-    const eventHandler = (payload: any) => {
+    const eventHandler = (payload: unknown) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'debug:event', payload }));
       }
     };
-    const checkpointHandler = (payload: any) => {
+    const checkpointHandler = (payload: unknown) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: 'checkpoint:created', payload }));
       }
@@ -110,8 +111,8 @@ export function setupWebSocket(wss: WebSocketServer) {
                 }
               }));
             }
-          } catch (streamErr: any) {
-            console.error('流式发送错误:', streamErr);
+          } catch (streamErr: unknown) {
+            logger.error(streamErr, '流式发送错误:');
           }
 
           if (ws.readyState === WebSocket.OPEN) {
@@ -125,14 +126,14 @@ export function setupWebSocket(wss: WebSocketServer) {
             ws.send(JSON.stringify({ type: 'pong', payload: { timestamp: Date.now() } }));
           }
         }
-      } catch (error: any) {
-        console.error('WebSocket 消息处理错误:', error);
-        sendError(ws, error.message || '消息处理失败');
+      } catch (error: unknown) {
+        logger.error(error, 'WebSocket 消息处理错误:');
+        sendError(ws, error instanceof Error ? error.message : '消息处理失败');
       }
     });
 
     ws.on('close', () => {
-      console.log('🔌 WebSocket 客户端已断开');
+      logger.info('🔌 WebSocket 客户端已断开');
       // Properly unsubscribe from eventBus — fixes the prior leak.
       const subs = subscriptions.get(ws);
       if (subs) {
@@ -144,12 +145,12 @@ export function setupWebSocket(wss: WebSocketServer) {
     });
 
     ws.on('error', (err) => {
-      console.error('WebSocket 错误:', err);
+      logger.error(err, 'WebSocket 错误:');
     });
   });
 
   wss.on('error', (err) => {
-    console.error('WebSocketServer 错误:', err);
+    logger.error(err, 'WebSocketServer 错误:');
   });
 }
 
@@ -162,6 +163,6 @@ function sendError(ws: WebSocket, message: string) {
       }));
     }
   } catch (err) {
-    console.error('发送错误消息失败:', err);
+    logger.error(err, '发送错误消息失败:');
   }
 }

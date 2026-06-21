@@ -1,5 +1,6 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, Application } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import type { Provider, Settings } from '@ordpaw/shared';
 import { agentRuntime } from '../core/agent-runtime.js';
 import { sessionManager } from '../core/session.js';
 import { checkpointManager } from '../core/checkpoint.js';
@@ -16,7 +17,7 @@ import { setupDownloadRoutes } from '../core/download-service.js';
 import { asyncHandler, ApiError, validateBody } from '../middleware.js';
 import { queryAll, queryOne, rowToObject, safeJsonParse, safeCount as dbSafeCount } from '../db/utils.js';
 
-const DEFAULT_SETTINGS: any = {
+const DEFAULT_SETTINGS: Settings = {
   theme: 'ordpaw-light',
   uiMode: 'classic',
   uiEffects: 'balanced',
@@ -29,12 +30,12 @@ const DEFAULT_SETTINGS: any = {
   apiEndpoints: {}
 };
 
-export function setupApiRoutes(app: any) {
+export function setupApiRoutes(app: Application) {
   const router = Router();
   app.use('/api', router);
 
   // ============ Agent API ============
-  router.get('/agents', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/agents', asyncHandler(async (_req: Request, res: Response) => {
     const agents = agentRuntime.listAgents();
     res.json(agents);
   }));
@@ -65,9 +66,10 @@ export function setupApiRoutes(app: any) {
   // ============ Provider API ============
   // Strip API key from responses sent to the client. The frontend only needs
   // to know whether a key is set (boolean), never the key itself.
-  function stripApiKey(provider: any) {
+  function stripApiKey(provider: Provider | Record<string, unknown> | null) {
     if (!provider) return provider;
-    return { ...provider, apiKey: provider.apiKey ? '••••••' : '', hasApiKey: Boolean(provider.apiKey) };
+    const p = provider as Provider;
+    return { ...p, apiKey: p.apiKey ? '••••••' : '', hasApiKey: Boolean(p.apiKey) };
   }
 
   router.get('/providers', asyncHandler(async (_req: Request, res: Response) => {
@@ -216,7 +218,7 @@ export function setupApiRoutes(app: any) {
 
   // ============ 调试 API ============
   router.get('/debug/logs', asyncHandler(async (req: Request, res: Response) => {
-    const level = req.query.level as any;
+    const level = req.query.level as DebugLogEntry['level'] | undefined;
     const limit = Math.min(parseInt(req.query.limit as string || '100', 10), 500);
     res.json(debugLogger.getLogs(level, limit));
   }));
@@ -233,7 +235,7 @@ export function setupApiRoutes(app: any) {
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
 
-    const send = (event: string, data: any) => {
+    const send = (event: string, data: unknown) => {
       res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
     };
 
@@ -256,12 +258,12 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ 技能 API ============
-  router.get('/skills', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/skills', asyncHandler(async (_req: Request, res: Response) => {
     const skills = skillRunner.listSkills();
     res.json(skills);
   }));
 
-  router.get('/skills/installed', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/skills/installed', asyncHandler(async (_req: Request, res: Response) => {
     res.json(skillRunner.listInstalled());
   }));
 
@@ -287,7 +289,7 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ MCP Server API ============
-  router.get('/mcp', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/mcp', asyncHandler(async (_req: Request, res: Response) => {
     res.json(mcpClient.listServers());
   }));
 
@@ -317,7 +319,7 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ 提示词库 API ============
-  router.get('/prompts', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/prompts', asyncHandler(async (_req: Request, res: Response) => {
     const db = getDatabase();
     const result = db.exec('SELECT * FROM prompts ORDER BY updated_at DESC');
     if (result.length === 0) {
@@ -325,14 +327,14 @@ export function setupApiRoutes(app: any) {
       return;
     }
     const { columns, values } = result[0];
-    const prompts = values.map((row: any[]) => {
+    const prompts = values.map((row: unknown[]) => {
       const p = rowToObject(columns, row);
       return {
         id: p.id,
         name: p.name,
         category: p.category,
         content: p.content,
-        variables: safeJsonParse(p.variables_json, []),
+        variables: safeJsonParse(p.variables_json as string, []),
         version: p.version,
         createdAt: p.created_at,
         updatedAt: p.updated_at
@@ -397,7 +399,7 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ 插件 API ============
-  router.get('/plugins', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/plugins', asyncHandler(async (_req: Request, res: Response) => {
     const db = getDatabase();
     const result = db.exec('SELECT * FROM plugins');
     if (result.length === 0) {
@@ -405,15 +407,15 @@ export function setupApiRoutes(app: any) {
       return;
     }
     const { columns, values } = result[0];
-    const plugins = values.map((row: any[]) => {
+    const plugins = values.map((row: unknown[]) => {
       const p = rowToObject(columns, row);
       return {
         id: p.id,
         name: p.name,
         version: p.version,
         description: p.description,
-        manifest: safeJsonParse(p.manifest_json, {}),
-        config: safeJsonParse(p.config_json, {}),
+        manifest: safeJsonParse(p.manifest_json as string, {}),
+        config: safeJsonParse(p.config_json as string, {}),
         state: p.state,
         enabled: p.enabled === 1
       };
@@ -421,7 +423,7 @@ export function setupApiRoutes(app: any) {
     res.json(plugins);
   }));
 
-  router.post('/plugins/install', validateBody<{ name: string; manifest: any }>({
+  router.post('/plugins/install', validateBody<{ name: string; manifest: Record<string, unknown> }>({
     name: 'string',
     manifest: 'object'
   }), asyncHandler(async (req: Request, res: Response) => {
@@ -467,16 +469,16 @@ export function setupApiRoutes(app: any) {
   setupDownloadRoutes(router);
 
   // ============ 设置 API ============
-  router.get('/settings', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/settings', asyncHandler(async (_req: Request, res: Response) => {
     const db = getDatabase();
     const result = db.exec('SELECT * FROM settings');
-    const settingsObj: any = { ...DEFAULT_SETTINGS };
+    const settingsObj: Partial<Settings> = { ...DEFAULT_SETTINGS };
     if (result.length > 0) {
-      result[0].values.forEach((row: any[]) => {
+      result[0].values.forEach((row: unknown[]) => {
         const key = row[0] as string;
         const value = safeJsonParse(row[1], null);
         if (value !== null) {
-          settingsObj[key] = value;
+          (settingsObj as Record<string, unknown>)[key] = value;
         }
       });
     }
@@ -509,12 +511,12 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ 脚本 API ============
-  router.get('/scripts', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/scripts', asyncHandler(async (_req: Request, res: Response) => {
     const scripts = scriptMcp.listScripts();
     res.json(scripts);
   }));
 
-  router.get('/scripts/tools', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/scripts/tools', asyncHandler(async (_req: Request, res: Response) => {
     res.json(scriptMcp.listTools());
   }));
 
@@ -545,7 +547,7 @@ export function setupApiRoutes(app: any) {
     res.json({ success: true });
   }));
 
-  router.post('/scripts/:id/execute', validateBody<Record<string, any>>({}), asyncHandler(async (req: Request, res: Response) => {
+  router.post('/scripts/:id/execute', validateBody<Record<string, unknown>>({}), asyncHandler(async (req: Request, res: Response) => {
     const { args, context } = req.body || {};
     const result = await scriptMcp.executeScript(req.params.id, args || {}, context || {});
     res.json(result);
@@ -557,7 +559,7 @@ export function setupApiRoutes(app: any) {
     res.json(result);
   }));
 
-  router.post('/mcp/scripts/call', validateBody<{ tool: string; params: any }>({
+  router.post('/mcp/scripts/call', validateBody<{ tool: string; params: Record<string, unknown> }>({
     tool: 'string',
     params: 'object'
   }), asyncHandler(async (req: Request, res: Response) => {
@@ -566,7 +568,7 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ 统计 API ============
-  router.get('/stats', asyncHandler(async (req: Request, res: Response) => {
+  router.get('/stats', asyncHandler(async (_req: Request, res: Response) => {
     const cached = statsCache.get('stats');
     if (cached) {
       res.json(cached);
@@ -640,47 +642,47 @@ export function setupApiRoutes(app: any) {
     const db = getDatabase();
     const scope = (req.query.scope as string) || 'all';
 
-    const data: Record<string, any> = { version: 1, exportedAt: Date.now(), scope };
+    const data: Record<string, unknown> = { version: 1, exportedAt: Date.now(), scope };
 
-    const queryAll = (sql: string) => {
+    const queryAllLocal = (sql: string) => {
       const result = db.exec(sql);
       if (result.length === 0) return [];
-      return result[0].values.map((row: any[]) => rowToObject(result[0].columns, row));
+      return result[0].values.map((row: unknown[]) => rowToObject(result[0].columns, row));
     };
 
     if (scope === 'all' || scope === 'agents') {
-      data.agents = queryAll('SELECT * FROM agents');
+      data.agents = queryAllLocal('SELECT * FROM agents');
     }
     if (scope === 'all' || scope === 'conversations') {
-      data.conversations = queryAll('SELECT * FROM conversations');
-      data.messages = queryAll('SELECT * FROM messages');
-      data.checkpoints = queryAll('SELECT * FROM checkpoints');
+      data.conversations = queryAllLocal('SELECT * FROM conversations');
+      data.messages = queryAllLocal('SELECT * FROM messages');
+      data.checkpoints = queryAllLocal('SELECT * FROM checkpoints');
     }
     if (scope === 'all' || scope === 'providers') {
-      data.providers = queryAll('SELECT * FROM providers');
+      data.providers = queryAllLocal('SELECT * FROM providers');
     }
     if (scope === 'all' || scope === 'prompts') {
-      data.prompts = queryAll('SELECT * FROM prompts');
+      data.prompts = queryAllLocal('SELECT * FROM prompts');
     }
     if (scope === 'all' || scope === 'scripts') {
-      data.scripts = queryAll('SELECT * FROM scripts');
+      data.scripts = queryAllLocal('SELECT * FROM scripts');
     }
     if (scope === 'all' || scope === 'settings') {
-      data.settings = queryAll('SELECT * FROM settings');
+      data.settings = queryAllLocal('SELECT * FROM settings');
     }
     if (scope === 'all' || scope === 'testSuites') {
-      data.testSuites = queryAll('SELECT * FROM test_suites');
-      data.testCases = queryAll('SELECT * FROM test_cases');
-      data.testRuns = queryAll('SELECT * FROM test_runs');
+      data.testSuites = queryAllLocal('SELECT * FROM test_suites');
+      data.testCases = queryAllLocal('SELECT * FROM test_cases');
+      data.testRuns = queryAllLocal('SELECT * FROM test_runs');
     }
     if (scope === 'all' || scope === 'plugins') {
-      data.plugins = queryAll('SELECT * FROM plugins');
+      data.plugins = queryAllLocal('SELECT * FROM plugins');
     }
     if (scope === 'all' || scope === 'mcp') {
-      data.mcpServers = queryAll('SELECT * FROM mcp_servers');
+      data.mcpServers = queryAllLocal('SELECT * FROM mcp_servers');
     }
     if (scope === 'all' || scope === 'skills') {
-      data.installedSkills = queryAll('SELECT * FROM installed_skills');
+      data.installedSkills = queryAllLocal('SELECT * FROM installed_skills');
     }
 
     res.setHeader('Content-Disposition', `attachment; filename="agent-studio-export-${Date.now()}.json"`);
@@ -693,10 +695,10 @@ export function setupApiRoutes(app: any) {
     if (convResult.length === 0) throw ApiError.notFound('会话不存在');
     const conv = rowToObject(convResult[0].columns, convResult[0].values[0]);
 
-    const queryAll = (sql: string, params?: any[]) => {
+    const queryAllLocal = (sql: string, params?: unknown[]) => {
       const result = params ? db.exec(sql, params) : db.exec(sql);
       if (result.length === 0) return [];
-      return result[0].values.map((row: any[]) => rowToObject(result[0].columns, row));
+      return result[0].values.map((row: unknown[]) => rowToObject(result[0].columns, row));
     };
 
     const data = {
@@ -704,8 +706,8 @@ export function setupApiRoutes(app: any) {
       exportedAt: Date.now(),
       scope: 'conversation',
       conversation: conv,
-      messages: queryAll('SELECT * FROM messages WHERE conversation_id = ?', [req.params.id]),
-      checkpoints: queryAll('SELECT * FROM checkpoints WHERE conversation_id = ?', [req.params.id])
+      messages: queryAllLocal('SELECT * FROM messages WHERE conversation_id = ?', [req.params.id]),
+      checkpoints: queryAllLocal('SELECT * FROM checkpoints WHERE conversation_id = ?', [req.params.id])
     };
 
     res.setHeader('Content-Disposition', `attachment; filename="conversation-${req.params.id}.json"`);
@@ -714,16 +716,18 @@ export function setupApiRoutes(app: any) {
 
   router.post('/import', asyncHandler(async (req: Request, res: Response) => {
     const db = getDatabase();
-    const data = req.body;
+    const data = req.body as Record<string, unknown>;
     if (!data || typeof data !== 'object') throw ApiError.badRequest('无效的导入数据');
 
     const imported: string[] = [];
 
-    const insertIf = (table: string, rows: any[], cols: string[]) => {
+    const insertIf = (table: string, rows: unknown[], cols: string[]) => {
       if (!rows || !Array.isArray(rows) || rows.length === 0) return;
       for (const row of rows) {
+        if (!row || typeof row !== 'object') continue;
+        const record = row as Record<string, unknown>;
         const vals = cols.map(c => {
-          const v = row[c];
+          const v = record[c];
           if (v === undefined) return null;
           return typeof v === 'object' ? JSON.stringify(v) : v;
         });
@@ -737,20 +741,20 @@ export function setupApiRoutes(app: any) {
       imported.push(table);
     };
 
-    if (data.agents) insertIf('agents', data.agents, ['id','name','description','system_prompt','provider_id','model','skills_json','mcp_json','created_at','updated_at']);
-    if (data.providers) insertIf('providers', data.providers, ['id','name','type','base_url','api_key_name','api_key','models_json','enabled','is_built_in','config_json','created_at','updated_at']);
-    if (data.conversations) insertIf('conversations', data.conversations, ['id','agent_id','title','variables_json','created_at','updated_at']);
-    if (data.messages) insertIf('messages', data.messages, ['id','conversation_id','role','content','metadata_json','timestamp']);
-    if (data.checkpoints) insertIf('checkpoints', data.checkpoints, ['id','conversation_id','message_id','state_json','label','created_at']);
-    if (data.prompts) insertIf('prompts', data.prompts, ['id','name','category','content','variables_json','version','created_at','updated_at']);
-    if (data.scripts) insertIf('scripts', data.scripts, ['id','name','description','code','language','created_at','updated_at']);
-    if (data.settings) insertIf('settings', data.settings, ['key','value_json']);
-    if (data.testSuites) insertIf('test_suites', data.testSuites, ['id','agent_id','name','description','created_at','updated_at']);
-    if (data.testCases) insertIf('test_cases', data.testCases, ['id','suite_id','name','input','expected_output','expected_contains_json','variables_json','created_at','updated_at']);
-    if (data.testRuns) insertIf('test_runs', data.testRuns, ['id','suite_id','agent_id','results_json','passed','failed','created_at']);
-    if (data.plugins) insertIf('plugins', data.plugins, ['id','name','version','description','manifest_json','config_json','state','enabled']);
-    if (data.mcpServers) insertIf('mcp_servers', data.mcpServers, ['id','name','transport','command','url','env_json','enabled','connected','created_at','updated_at']);
-    if (data.installedSkills) insertIf('installed_skills', data.installedSkills, ['id','name','description','parameters_json','code','source','enabled','created_at','updated_at']);
+    if (data.agents) insertIf('agents', data.agents as unknown[], ['id','name','description','system_prompt','provider_id','model','skills_json','mcp_json','created_at','updated_at']);
+    if (data.providers) insertIf('providers', data.providers as unknown[], ['id','name','type','base_url','api_key_name','api_key','models_json','enabled','is_built_in','config_json','created_at','updated_at']);
+    if (data.conversations) insertIf('conversations', data.conversations as unknown[], ['id','agent_id','title','variables_json','created_at','updated_at']);
+    if (data.messages) insertIf('messages', data.messages as unknown[], ['id','conversation_id','role','content','metadata_json','timestamp']);
+    if (data.checkpoints) insertIf('checkpoints', data.checkpoints as unknown[], ['id','conversation_id','message_id','state_json','label','created_at']);
+    if (data.prompts) insertIf('prompts', data.prompts as unknown[], ['id','name','category','content','variables_json','version','created_at','updated_at']);
+    if (data.scripts) insertIf('scripts', data.scripts as unknown[], ['id','name','description','code','language','created_at','updated_at']);
+    if (data.settings) insertIf('settings', data.settings as unknown[], ['key','value_json']);
+    if (data.testSuites) insertIf('test_suites', data.testSuites as unknown[], ['id','agent_id','name','description','created_at','updated_at']);
+    if (data.testCases) insertIf('test_cases', data.testCases as unknown[], ['id','suite_id','name','input','expected_output','expected_contains_json','variables_json','created_at','updated_at']);
+    if (data.testRuns) insertIf('test_runs', data.testRuns as unknown[], ['id','suite_id','agent_id','results_json','passed','failed','created_at']);
+    if (data.plugins) insertIf('plugins', data.plugins as unknown[], ['id','name','version','description','manifest_json','config_json','state','enabled']);
+    if (data.mcpServers) insertIf('mcp_servers', data.mcpServers as unknown[], ['id','name','transport','command','url','env_json','enabled','connected','created_at','updated_at']);
+    if (data.installedSkills) insertIf('installed_skills', data.installedSkills as unknown[], ['id','name','description','parameters_json','code','source','enabled','created_at','updated_at']);
 
     saveDatabase();
     statsCache.clear();

@@ -8,36 +8,32 @@ import { eventBus } from '../core/event-bus.js';
 import { componentServer } from '../core/component-server.js';
 import { sessionManager } from '../core/session.js';
 import { queryOne, queryAll } from '../db/utils.js';
-import type { ComponentContribution } from '@ordpaw/shared';
+import { logger } from '../core/logger.js';
+import type { ComponentContribution, EventCallback } from '@ordpaw/shared';
 
 const PLUGINS_DIR = join(process.cwd(), 'plugins');
 
 export function createPluginApi(pluginName: string, pluginPath: string) {
   return {
-    logger: {
-      info: (...args: any[]) => console.log(`[${pluginName}]`, ...args),
-      debug: (...args: any[]) => console.debug(`[${pluginName}]`, ...args),
-      warn: (...args: any[]) => console.warn(`[${pluginName}]`, ...args),
-      error: (...args: any[]) => console.error(`[${pluginName}]`, ...args),
-    },
+    logger: logger.child({ plugin: pluginName }),
     config: {},
-    registerSkill: (skill: { id: string; name: string; description: string; parameters: any; execute: (params: any) => Promise<any> }) => {
+    registerSkill: (skill: { id: string; name: string; description: string; parameters: unknown; execute: (params: unknown) => Promise<unknown> }) => {
       skillRunner.registerSkill(skill);
-      console.log(`插件 ${pluginName} 注册了技能: ${skill.name}`);
+      logger.info(`插件 ${pluginName} 注册了技能: ${skill.name}`);
     },
     getSession: (id: string) => {
       return sessionManager.getConversation(id);
     },
-    emit: (event: string, data: any) => {
+    emit: (event: string, data: unknown) => {
       eventBus.emit(event, data);
     },
     registerComponent: (contribution: ComponentContribution) => {
       componentServer.register(pluginName, [contribution], pluginPath);
-      console.log(`插件 ${pluginName} 注册了组件: ${contribution.name}`);
+      logger.info(`插件 ${pluginName} 注册了组件: ${contribution.name}`);
     },
     db: {
       get: (key: string) => {
-        const row = queryOne<any>(
+        const row = queryOne<{ value_json: string }>(
           getDatabase(),
           'SELECT value_json FROM plugin_storage WHERE plugin_name = ? AND key = ?',
           [pluginName, key]
@@ -45,7 +41,7 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
         if (!row) return undefined;
         try { return JSON.parse(row.value_json); } catch { return undefined; }
       },
-      set: (key: string, value: any) => {
+      set: (key: string, value: unknown) => {
         const valueJson = JSON.stringify(value);
         getDatabase().run(
           `INSERT INTO plugin_storage (plugin_name, key, value_json, updated_at)
@@ -63,7 +59,7 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
         saveDatabase();
       },
       list: () => {
-        const rows = queryAll<any>(
+        const rows = queryAll<{ key: string }>(
           getDatabase(),
           'SELECT key FROM plugin_storage WHERE plugin_name = ? ORDER BY key ASC',
           [pluginName]
@@ -83,7 +79,7 @@ export function createPluginApi(pluginName: string, pluginPath: string) {
 
 export async function loadPlugins() {
   if (!existsSync(PLUGINS_DIR)) {
-    console.log('插件目录不存在，跳过插件加载');
+    logger.info('插件目录不存在，跳过插件加载');
     return;
   }
 
@@ -97,15 +93,15 @@ export async function loadPlugins() {
       const manifestPath = join(pluginPath, 'plugin.json');
       
       if (!existsSync(manifestPath)) {
-        console.warn(`插件 ${pluginName} 缺少 plugin.json，跳过`);
+        logger.warn(`插件 ${pluginName} 缺少 plugin.json，跳过`);
         continue;
       }
 
       const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
       const mainFile = join(pluginPath, manifest.main || 'index.js');
-      
+
       if (!existsSync(mainFile)) {
-        console.warn(`插件 ${pluginName} 主文件不存在，跳过`);
+        logger.warn(`插件 ${pluginName} 主文件不存在，跳过`);
         continue;
       }
 
@@ -122,19 +118,19 @@ export async function loadPlugins() {
       // 注册事件处理器
       if (plugin.handlers) {
         for (const [event, handler] of Object.entries(plugin.handlers)) {
-          eventBus.on(event, handler as any);
+          eventBus.on(event, handler as EventCallback);
         }
       }
 
       // 注册前端组件贡献
       if (manifest.frontend && Array.isArray(manifest.frontend)) {
         componentServer.register(pluginName, manifest.frontend as ComponentContribution[], pluginPath);
-        console.log(`插件 ${pluginName} 注册了 ${manifest.frontend.length} 个前端组件`);
+        logger.info(`插件 ${pluginName} 注册了 ${manifest.frontend.length} 个前端组件`);
       }
 
-      console.log(`✅ 插件 ${pluginName} 已加载`);
+      logger.info(`✅ 插件 ${pluginName} 已加载`);
     } catch (error) {
-      console.error(`❌ 插件 ${pluginName} 加载失败:`, error);
+      logger.error(error, `❌ 插件 ${pluginName} 加载失败:`);
     }
   }
 }

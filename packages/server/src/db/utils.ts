@@ -8,7 +8,7 @@
  * Non-string values are returned as-is (allows transparent pass-through
  * for already-parsed values).
  */
-export function safeJsonParse<T>(value: any, fallback: T): T {
+export function safeJsonParse<T>(value: unknown, fallback: T): T {
   if (value === null || value === undefined) return fallback;
   if (typeof value !== 'string') return value as T;
   try {
@@ -21,8 +21,8 @@ export function safeJsonParse<T>(value: any, fallback: T): T {
 /**
  * Convert a sql.js row (array of values) into an object keyed by column name.
  */
-export function rowToObject(columns: string[], row: any[]): Record<string, any> {
-  const obj: Record<string, any> = {};
+export function rowToObject(columns: string[], row: unknown[]): Record<string, unknown> {
+  const obj: Record<string, unknown> = {};
   for (let i = 0; i < columns.length; i++) {
     obj[columns[i]] = row[i];
   }
@@ -32,10 +32,10 @@ export function rowToObject(columns: string[], row: any[]): Record<string, any> 
 /**
  * Run a SELECT and return all rows as objects. Returns [] when no rows.
  */
-export function queryAll<T = Record<string, any>>(
-  db: { exec: (sql: string, params?: any[]) => Array<{ columns: string[]; values: any[][] }> },
+export function queryAll<T = Record<string, unknown>>(
+  db: { exec: (sql: string, params?: unknown[]) => Array<{ columns: string[]; values: unknown[][] }> },
   sql: string,
-  params: any[] = []
+  params: unknown[] = []
 ): T[] {
   const result = db.exec(sql, params);
   if (result.length === 0 || result[0].values.length === 0) return [];
@@ -46,10 +46,10 @@ export function queryAll<T = Record<string, any>>(
 /**
  * Run a SELECT and return the first row as an object, or null when no rows.
  */
-export function queryOne<T = Record<string, any>>(
-  db: { exec: (sql: string, params?: any[]) => Array<{ columns: string[]; values: any[][] }> },
+export function queryOne<T = Record<string, unknown>>(
+  db: { exec: (sql: string, params?: unknown[]) => Array<{ columns: string[]; values: unknown[][] }> },
   sql: string,
-  params: any[] = []
+  params: unknown[] = []
 ): T | null {
   const rows = queryAll<T>(db, sql, params);
   return rows.length > 0 ? rows[0] : null;
@@ -59,9 +59,9 @@ export function queryOne<T = Record<string, any>>(
  * Count rows for a query. Returns 0 on any error or empty result.
  */
 export function safeCount(
-  db: { exec: (sql: string, params?: any[]) => Array<{ columns: string[]; values: any[][] }> },
+  db: { exec: (sql: string, params?: unknown[]) => Array<{ columns: string[]; values: unknown[][] }> },
   sql: string,
-  params: any[] = []
+  params: unknown[] = []
 ): number {
   const result = db.exec(sql, params);
   if (result.length === 0 || result[0].values.length === 0) return 0;

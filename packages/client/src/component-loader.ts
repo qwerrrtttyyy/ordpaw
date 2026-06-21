@@ -1,4 +1,5 @@
 import type { ComponentContribution } from '@ordpaw/shared';
+import { logger } from './logger';
 
 type LifecycleHook = (el: HTMLElement) => void | Promise<void>;
 
@@ -8,7 +9,7 @@ interface ComponentInstance {
   type: string;
   src: string;
   plugin: string;
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   mount?: LifecycleHook;
   unmount?: LifecycleHook;
   mountedElements: WeakSet<HTMLElement>;
@@ -54,18 +55,18 @@ export async function loadPluginComponents(baseUrl = '/api/components/manifest')
     }
     return contributions;
   } catch (err) {
-    console.warn('组件加载失败:', err);
+    logger.warn(err, '组件加载失败');
     return [];
   }
 }
 
-export async function loadComponentTree(baseUrl = '/api/components/tree'): Promise<any> {
+export async function loadComponentTree(baseUrl = '/api/components/tree'): Promise<unknown> {
   try {
     const res = await fetch(baseUrl);
     if (!res.ok) return null;
     return await res.json();
   } catch (err) {
-    console.warn('组件树加载失败:', err);
+    logger.warn(err, '组件树加载失败');
     return null;
   }
 }
@@ -121,7 +122,7 @@ export function registerLifecycle(
 export async function mountComponent(id: string, el: HTMLElement): Promise<void> {
   const instance = componentRegistry.get(id);
   if (!instance) {
-    console.warn(`[ComponentLoader] 组件 ${id} 未注册`);
+    logger.warn(`[ComponentLoader] 组件 ${id} 未注册`);
     return;
   }
   el.setAttribute('data-component-id', id);
@@ -130,7 +131,7 @@ export async function mountComponent(id: string, el: HTMLElement): Promise<void>
     try {
       await instance.mount(el);
     } catch (err) {
-      console.error(`[ComponentLoader] 挂载组件 ${id} 失败:`, err);
+      logger.error(err, `[ComponentLoader] 挂载组件 ${id} 失败`);
     }
   }
 }
@@ -146,7 +147,7 @@ export async function unmountComponent(id: string, el: HTMLElement): Promise<voi
     try {
       await instance.unmount(el);
     } catch (err) {
-      console.error(`[ComponentLoader] 卸载组件 ${id} 失败:`, err);
+      logger.error(err, `[ComponentLoader] 卸载组件 ${id} 失败`);
     }
   }
   el.removeAttribute('data-component-id');
@@ -161,7 +162,7 @@ export function registerRuntimeComponent(contribution: ComponentContribution): v
   const id = `${contribution.metadata?.__plugin || 'runtime'}:${contribution.name}`;
   const existing = componentRegistry.get(id);
   if (existing) {
-    console.warn(`[ComponentLoader] 组件 ${id} 已存在，将被覆盖`);
+    logger.warn(`[ComponentLoader] 组件 ${id} 已存在，将被覆盖`);
   }
   // 优先保留已注册的钩子
   const hooks = lifecycleHooks.get(id);

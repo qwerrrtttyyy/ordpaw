@@ -5,6 +5,10 @@
   "type": "module",
   "main": "src/types.ts",
   "types": "src/types.ts",
+  "exports": {
+    ".": "./src/types.ts",
+    "./errors": "./src/errors.ts"
+  },
   "scripts": {
     "build": "tsc",
     "typecheck": "tsc --noEmit"

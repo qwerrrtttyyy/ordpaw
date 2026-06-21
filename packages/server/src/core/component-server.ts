@@ -4,6 +4,7 @@ import { join, resolve } from 'path';
 import type { ComponentContribution } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { queryAll, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
 
 const PLUGINS_DIR = join(process.cwd(), 'plugins');
 
@@ -204,7 +205,7 @@ class ComponentServerImpl {
       saveDatabase();
     } catch (err) {
       if (process.env.NODE_ENV !== 'test') {
-        console.error('组件持久化失败:', err);
+        logger.error(err, '组件持久化失败');
       }
     }
   }
@@ -212,17 +213,17 @@ class ComponentServerImpl {
   loadFromDatabase() {
     try {
       const db = getDatabase();
-      const rows = queryAll<any>(db, 'SELECT * FROM components ORDER BY created_at ASC');
+      const rows = queryAll<Record<string, unknown>>(db, 'SELECT * FROM components ORDER BY created_at ASC');
       this.contributions = rows.map(c => ({
-        type: c.type,
-        name: c.name,
-        src: c.src,
-        slot: c.slot,
-        metadata: safeJsonParse(c.metadata_json, {})
+        type: String(c.type),
+        name: String(c.name),
+        src: String(c.src),
+        slot: c.slot === null || c.slot === undefined ? undefined : String(c.slot),
+        metadata: safeJsonParse<Record<string, unknown>>(c.metadata_json, {})
       }) as ComponentContribution);
       this.buildComponentTree();
     } catch (err) {
-      console.error('loadFromDatabase 组件失败:', err);
+      logger.error(err, 'loadFromDatabase 组件失败');
     }
   }
 

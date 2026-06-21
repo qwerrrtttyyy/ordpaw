@@ -6,6 +6,7 @@ import type { Script, ScriptExecutionResult, ScriptTool, ScriptToolCall } from '
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
 
 const scriptsDir = join(process.cwd(), 'data', 'scripts');
 mkdirSync(scriptsDir, { recursive: true });
@@ -139,14 +140,14 @@ export class ScriptMcp {
 
   listScripts(): Script[] {
     const db = getDatabase();
-    const rows = queryAll<any>(db, 'SELECT * FROM scripts ORDER BY updated_at DESC');
+    const rows = queryAll<Record<string, unknown>>(db, 'SELECT * FROM scripts ORDER BY updated_at DESC');
     return rows.map(row => this.rowToScript(row));
   }
 
   getScript(idOrName: string): Script | null {
     const db = getDatabase();
-    let row = queryOne<any>(db, 'SELECT * FROM scripts WHERE id = ?', [idOrName]);
-    if (!row) row = queryOne<any>(db, 'SELECT * FROM scripts WHERE name = ?', [idOrName]);
+    let row = queryOne<Record<string, unknown>>(db, 'SELECT * FROM scripts WHERE id = ?', [idOrName]);
+    if (!row) row = queryOne<Record<string, unknown>>(db, 'SELECT * FROM scripts WHERE name = ?', [idOrName]);
     if (!row) return null;
     return this.rowToScript(row);
   }
@@ -217,7 +218,7 @@ export class ScriptMcp {
     return true;
   }
 
-  async executeScript(idOrName: string, args: Record<string, any> = {}, context: Record<string, any> = {}): Promise<ScriptExecutionResult> {
+  async executeScript(idOrName: string, args: Record<string, unknown> = {}, context: Record<string, unknown> = {}): Promise<ScriptExecutionResult> {
     const script = this.getScript(idOrName);
     if (!script) return { success: false, error: `Script not found: ${idOrName}`, logs: [], duration: 0 };
 
@@ -229,10 +230,11 @@ export class ScriptMcp {
       const duration = Date.now() - start;
       eventBus.emit('script:executed', { id: script.id, name: script.name, duration, success: true });
       return { success: true, output: result, logs, duration };
-    } catch (err: any) {
+    } catch (err: unknown) {
       const duration = Date.now() - start;
-      eventBus.emit('script:executed', { id: script.id, name: script.name, duration, success: false, error: err.message });
-      return { success: false, error: err.message, logs, duration };
+      const message = err instanceof Error ? err.message : String(err);
+      eventBus.emit('script:executed', { id: script.id, name: script.name, duration, success: false, error: message });
+      return { success: false, error: message, logs, duration };
     }
   }
 
@@ -298,7 +300,7 @@ export class ScriptMcp {
     try {
       writeFileSync(filePath, `// ${script.name}\n// ${script.description}\n\n${script.code}\n`, 'utf-8');
     } catch (err) {
-      console.error('Failed to persist script to file:', err);
+      logger.error(err, 'Failed to persist script to file');
     }
   }
 
@@ -314,7 +316,7 @@ export class ScriptMcp {
    * 3. Wall-clock timeout via `vm.Script` + `script.runInContext({ timeout })`.
    * 4. console.log/warn/error captured into the logs array.
    */
-  private runInSandbox(code: string, args: Record<string, any>, context: Record<string, any>, logs: string[]): any {
+  private runInSandbox(code: string, args: Record<string, unknown>, context: Record<string, unknown>, logs: string[]): unknown {
     // Wrap user code in an IIFE so `return ...` works.
     // The vm context provides all standard JS globals (Math, JSON, Date, etc.)
     // automatically — we only need to inject our helpers.
@@ -349,7 +351,7 @@ export class ScriptMcp {
     // JSON, Date, etc.) on the context object; we just augment with our
     // helpers. Critically, process / require / global / module are NOT
     // exposed, so user code cannot escape to Node primitives.
-    const sandbox: Record<string, any> = {
+    const sandbox: Record<string, unknown> = {
       __logs: logs,
       __args: args,
       __context: context,
@@ -388,15 +390,15 @@ export class ScriptMcp {
     return result;
   }
 
-  private rowToScript(row: any): Script {
+  private rowToScript(row: Record<string, unknown>): Script {
     return {
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      code: row.code,
-      language: row.language,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at
+      id: String(row.id),
+      name: String(row.name),
+      description: String(row.description || ''),
+      code: String(row.code || ''),
+      language: String(row.language || 'javascript') as Script['language'],
+      createdAt: Number(row.created_at || Date.now()),
+      updatedAt: Number(row.updated_at || Date.now())
     };
   }
 }

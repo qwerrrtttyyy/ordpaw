@@ -4,12 +4,12 @@ declare module '*.css' {
 }
 
 interface PluginApi {
-  registerActionHandler(type: string, handler: (params: Record<string, any>, context: any) => any): void;
+  registerActionHandler(type: string, handler: (params: Record<string, unknown>, context: unknown) => unknown): void;
   unregisterActionHandler(type: string): void;
-  emit(event: string, payload?: any): void;
-  on(event: string, handler: (payload: any) => void): () => void;
+  emit(event: string, payload?: unknown): void;
+  on(event: string, handler: (payload: unknown) => void): () => void;
   toast(message: string): void;
-  getSettings(): Record<string, any>;
+  getSettings(): Record<string, unknown>;
 }
 
 interface Window {

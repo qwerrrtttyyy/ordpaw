@@ -1,18 +1,41 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Checkpoint } from '@ordpaw/shared';
+import type { Checkpoint, Message } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
+
+interface ConversationRow {
+  id: string;
+  variables_json: string;
+}
+
+interface MessageRow {
+  id: string;
+  role: Message['role'];
+  content: string;
+  metadata_json: string;
+  timestamp: number;
+}
+
+interface CheckpointRow {
+  id: string;
+  conversation_id: string;
+  message_id: string;
+  state_json: string;
+  label: string | null;
+  created_at: number;
+}
 
 export class CheckpointManager {
   createCheckpoint(conversationId: string, messageId: string, label?: string): Checkpoint | null {
     try {
       const db = getDatabase();
-      const conversation = queryOne<any>(db, 'SELECT * FROM conversations WHERE id = ?', [conversationId]);
+      const conversation = queryOne<ConversationRow>(db, 'SELECT * FROM conversations WHERE id = ?', [conversationId]);
       if (!conversation) return null;
 
       // Snapshot current messages + variables for time-travel rollback.
-      const messages = queryAll<any>(
+      const messages = queryAll<MessageRow>(
         db,
         'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC, id ASC',
         [conversationId]
@@ -24,9 +47,9 @@ export class CheckpointManager {
           role: m.role,
           content: m.content,
           timestamp: m.timestamp,
-          metadata: safeJsonParse(m.metadata_json, {})
+          metadata: safeJsonParse<Record<string, unknown>>(m.metadata_json, {})
         })),
-        variables: safeJsonParse(conversation.variables_json, {})
+        variables: safeJsonParse<Record<string, unknown>>(conversation.variables_json, {})
       };
 
       const checkpoint: Checkpoint = {
@@ -55,7 +78,7 @@ export class CheckpointManager {
 
       return checkpoint;
     } catch (err) {
-      console.error('createCheckpoint 错误:', err);
+      logger.error(err, 'createCheckpoint 错误:');
       return null;
     }
   }
@@ -63,7 +86,7 @@ export class CheckpointManager {
   getCheckpoints(conversationId: string): Checkpoint[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<any>(
+      const rows = queryAll<CheckpointRow>(
         db,
         'SELECT * FROM checkpoints WHERE conversation_id = ? ORDER BY created_at ASC',
         [conversationId]
@@ -73,12 +96,12 @@ export class CheckpointManager {
         id: cp.id,
         conversationId: cp.conversation_id,
         messageId: cp.message_id,
-        state: safeJsonParse(cp.state_json, { messages: [], variables: {} }),
-        label: cp.label,
+        state: safeJsonParse<{ messages: Message[]; variables: Record<string, unknown> }>(cp.state_json, { messages: [], variables: {} }),
+        label: cp.label || undefined,
         createdAt: cp.created_at
       }));
     } catch (err) {
-      console.error('getCheckpoints 错误:', err);
+      logger.error(err, 'getCheckpoints 错误:');
       return [];
     }
   }
@@ -99,7 +122,7 @@ export class CheckpointManager {
   rollbackToCheckpoint(conversationId: string, checkpointId: string): boolean {
     try {
       const db = getDatabase();
-      const checkpoint = queryOne<any>(
+      const checkpoint = queryOne<CheckpointRow>(
         db,
         'SELECT * FROM checkpoints WHERE id = ? AND conversation_id = ?',
         [checkpointId, conversationId]
@@ -107,7 +130,7 @@ export class CheckpointManager {
 
       if (!checkpoint) return false;
 
-      const state = safeJsonParse<{ messages: any[]; variables: any }>(
+      const state = safeJsonParse<{ messages: Array<Record<string, unknown>>; variables: Record<string, unknown> }>(
         checkpoint.state_json,
         { messages: [], variables: {} }
       );
@@ -152,7 +175,7 @@ export class CheckpointManager {
       eventBus.emit('checkpoint:rollback', { conversationId, checkpointId });
       return true;
     } catch (err) {
-      console.error('rollbackToCheckpoint 错误:', err);
+      logger.error(err, 'rollbackToCheckpoint 错误:');
       return false;
     }
   }

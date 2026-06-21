@@ -3,6 +3,22 @@ import type { Provider, ModelInfo, CreateProviderRequest } from '@ordpaw/shared'
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 import { obfuscateApiKey, deobfuscateApiKey } from './api-key-crypto.js';
+import { logger } from './logger.js';
+
+interface ProviderRow {
+  id: string;
+  name: string;
+  type: Provider['type'];
+  base_url: string;
+  api_key_name: string;
+  api_key: string;
+  models_json: string;
+  enabled: number;
+  is_built_in: number;
+  config_json: string;
+  created_at: number;
+  updated_at: number;
+}
 
 const BUILT_IN_PROVIDERS: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>[] = [
   {
@@ -58,10 +74,10 @@ export class ProviderService {
   listProviders(): Provider[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<any>(db, 'SELECT * FROM providers ORDER BY is_built_in DESC, name ASC');
+      const rows = queryAll<ProviderRow>(db, 'SELECT * FROM providers ORDER BY is_built_in DESC, name ASC');
       return rows.map(row => this.rowToProvider(row));
     } catch (err) {
-      console.error('listProviders 错误:', err);
+      logger.error(err, 'listProviders 错误:');
       return [];
     }
   }
@@ -69,12 +85,12 @@ export class ProviderService {
   getProvider(idOrType: string): Provider | null {
     try {
       const db = getDatabase();
-      let row = queryOne<any>(db, 'SELECT * FROM providers WHERE id = ?', [idOrType]);
-      if (!row) row = queryOne<any>(db, 'SELECT * FROM providers WHERE type = ? LIMIT 1', [idOrType]);
-      if (!row) row = queryOne<any>(db, 'SELECT * FROM providers WHERE name = ? LIMIT 1', [idOrType]);
+      let row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE id = ?', [idOrType]);
+      if (!row) row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE type = ? LIMIT 1', [idOrType]);
+      if (!row) row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE name = ? LIMIT 1', [idOrType]);
       return row ? this.rowToProvider(row) : null;
     } catch (err) {
-      console.error('getProvider 错误:', err);
+      logger.error(err, 'getProvider 错误:');
       return null;
     }
   }
@@ -82,10 +98,10 @@ export class ProviderService {
   getProviderByName(name: string): Provider | null {
     try {
       const db = getDatabase();
-      const row = queryOne<any>(db, 'SELECT * FROM providers WHERE name = ?', [name]);
+      const row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE name = ?', [name]);
       return row ? this.rowToProvider(row) : null;
     } catch (err) {
-      console.error('getProviderByName 错误:', err);
+      logger.error(err, 'getProviderByName 错误:');
       return null;
     }
   }
@@ -95,7 +111,7 @@ export class ProviderService {
     const now = Date.now();
     const id = uuidv4();
     const safeName = (data.name || '自定义服务商').toString();
-    const safeType = (data.type || 'custom').toString();
+    const safeType = (data.type || 'custom').toString() as Provider['type'];
     const safeBaseUrl = (data.baseUrl || '').toString();
     // Obfuscate before storing so the DB never holds plaintext keys.
     const safeApiKey = obfuscateApiKey((data.apiKey || '').toString());
@@ -118,7 +134,7 @@ export class ProviderService {
 
     const db = getDatabase();
     const updates: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
 
     if (data.name !== undefined) {
       updates.push('name = ?');
@@ -170,7 +186,7 @@ export class ProviderService {
       saveDatabase();
       return true;
     } catch (err) {
-      console.error('deleteProvider 错误:', err);
+      logger.error(err, 'deleteProvider 错误:');
       return false;
     }
   }
@@ -198,7 +214,7 @@ export class ProviderService {
     saveDatabase();
   }
 
-  private rowToProvider(p: any): Provider {
+  private rowToProvider(p: ProviderRow): Provider {
     return {
       id: p.id,
       name: p.name,
@@ -207,10 +223,10 @@ export class ProviderService {
       apiKeyName: p.api_key_name || undefined,
       // Deobfuscate on read so callers (agentRuntime) get the real key.
       apiKey: deobfuscateApiKey(p.api_key) || undefined,
-      models: safeJsonParse(p.models_json, []),
+      models: safeJsonParse<ModelInfo[]>(p.models_json, []),
       enabled: p.enabled === 1,
       isBuiltIn: p.is_built_in === 1,
-      config: safeJsonParse(p.config_json, {}),
+      config: safeJsonParse<Record<string, unknown>>(p.config_json, {}),
       createdAt: p.created_at,
       updatedAt: p.updated_at
     };

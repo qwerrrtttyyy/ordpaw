@@ -1,9 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors';
+import { logger } from './core/logger.js';
 
 /**
  * 异步处理包装器 - 自动捕获 Promise rejection
  */
-export function asyncHandler<T = any>(
+export function asyncHandler<T = unknown>(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<T>
 ) {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -14,29 +16,25 @@ export function asyncHandler<T = any>(
 /**
  * 自定义错误类
  */
-export class ApiError extends Error {
+export class ApiError extends OrdPawError {
   public statusCode: number;
-  public code: string;
-  public details?: any;
 
-  constructor(statusCode: number, message: string, code: string = 'API_ERROR', details?: any) {
-    super(message);
+  constructor(statusCode: number, message: string, code: string = OrdPawErrorCode.API_ERROR, details?: unknown) {
+    super(message, { status: statusCode, code, details });
     this.name = 'ApiError';
     this.statusCode = statusCode;
-    this.code = code;
-    this.details = details;
   }
 
-  static badRequest(message: string, details?: any) {
-    return new ApiError(400, message, 'BAD_REQUEST', details);
+  static badRequest(message: string, details?: unknown) {
+    return new ApiError(400, message, OrdPawErrorCode.BAD_REQUEST, details);
   }
 
   static notFound(message: string = '资源不存在') {
-    return new ApiError(404, message, 'NOT_FOUND');
+    return new ApiError(404, message, OrdPawErrorCode.NOT_FOUND);
   }
 
-  static internal(message: string = '服务器内部错误', details?: any) {
-    return new ApiError(500, message, 'INTERNAL_ERROR', details);
+  static internal(message: string = '服务器内部错误', details?: unknown) {
+    return new ApiError(500, message, OrdPawErrorCode.INTERNAL_ERROR, details);
   }
 }
 
@@ -52,8 +50,8 @@ export function errorHandler(
   const timestamp = new Date().toISOString();
 
   if (err instanceof ApiError) {
-    console.error(`[${timestamp}] ${err.code} ${req.method} ${req.path}: ${err.message}`);
-    if (err.details) console.error('  details:', err.details);
+    logger.error({ code: err.code, path: req.path, method: req.method, details: err.details }, `[${timestamp}] ${err.code} ${req.method} ${req.path}: ${err.message}`);
+    if (err.details) logger.error({ details: err.details }, '  details:');
     res.status(err.statusCode).json({
       error: err.message,
       code: err.code,
@@ -63,7 +61,7 @@ export function errorHandler(
   }
 
   // 未预期错误
-  console.error(`[${timestamp}] UNEXPECTED ${req.method} ${req.path}:`, err);
+  logger.error({ err, path: req.path, method: req.method }, `[${timestamp}] UNEXPECTED ${req.method} ${req.path}:`);
   res.status(500).json({
     error: '服务器内部错误',
     code: 'INTERNAL_ERROR',
@@ -82,11 +80,11 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     const duration = Date.now() - start;
     const log = `[${timestamp}] ${req.method} ${req.path} ${res.statusCode} ${duration}ms`;
     if (res.statusCode >= 500) {
-      console.error(log);
+      logger.error(log);
     } else if (res.statusCode >= 400) {
-      console.warn(log);
+      logger.warn(log);
     } else {
-      console.log(log);
+      logger.info(log);
     }
   });
 

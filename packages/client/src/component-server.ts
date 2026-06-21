@@ -1,6 +1,7 @@
 import type { ComponentContribution } from '@ordpaw/shared';
 import { animationManager } from './animation-manager';
 import { prefersReducedMotion, detectOS } from './utils';
+import { logger } from './logger';
 
 export type OSType = 'macos' | 'windows' | 'linux' | 'ios' | 'android' | 'unknown';
 
@@ -140,7 +141,7 @@ class ComponentServerImpl {
       const handlers = byId.get(key);
       if (!handlers) continue;
       for (const h of handlers) {
-        try { h(payload); } catch (e) { console.error(`[ComponentServer] event handler error for ${key}.${event}:`, e); }
+        try { h(payload); } catch (e) { logger.error(e, `[ComponentServer] event handler error for ${key}.${event}`); }
       }
     }
   }
@@ -164,7 +165,7 @@ class ComponentServerImpl {
   async mount(id: string, options: MountOptions = {}): Promise<HTMLElement | null> {
     const node = this.nodes.get(id);
     if (!node) {
-      console.warn(`[ComponentServer] 组件 ${id} 不存在`);
+      logger.warn(`[ComponentServer] 组件 ${id} 不存在`);
       return null;
     }
 
@@ -184,7 +185,7 @@ class ComponentServerImpl {
       const hook = node.mountHook || this.mountHooks.get(id);
       if (hook) await hook(el, options.props || {});
     } catch (e) {
-      console.error(`[ComponentServer] 挂载钩子失败 ${id}:`, e);
+      logger.error(e, `[ComponentServer] 挂载钩子失败 ${id}`);
     }
 
     this.applyOSAnimation(el, node);
@@ -203,7 +204,7 @@ class ComponentServerImpl {
         const hook = node?.unmountHook || this.unmountHooks.get(id);
         if (hook) await hook(target);
       } catch (e) {
-        console.error(`[ComponentServer] 卸载钩子失败 ${id}:`, e);
+        logger.error(e, `[ComponentServer] 卸载钩子失败 ${id}`);
       }
       target.remove();
       this.mounted.get(id)?.delete(target);

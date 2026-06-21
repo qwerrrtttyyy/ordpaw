@@ -11,6 +11,7 @@ import { skillRunner } from './skill-runner.js';
 import { scriptMcp } from './script-mcp.js';
 import { asyncHandler, ApiError, validateBody } from '../middleware.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -50,7 +51,7 @@ export function setupDownloadRoutes(router: Router) {
   }));
 
   // 服务端批量下载任务
-  router.post('/download/server', validateBody<{ items: any[]; serverPath: string }>({
+  router.post('/download/server', validateBody<{ items: unknown[]; serverPath: string }>({
     items: 'array',
     serverPath: 'string'
   }), asyncHandler(async (req: Request, res: Response) => {
@@ -76,9 +77,9 @@ export function setupDownloadRoutes(router: Router) {
 
     // 后台执行
     processServerTask(task).catch(err => {
-      console.error('服务端下载任务失败:', err);
+      logger.error(err, '服务端下载任务失败');
       task.status = 'failed';
-      task.error = err?.message || '执行失败';
+      task.error = err instanceof Error ? err.message : '执行失败';
       task.updatedAt = Date.now();
     });
 
@@ -176,9 +177,9 @@ async function processServerTask(task: DownloadTask): Promise<void> {
         task.progress = Math.min(100, Math.floor((task.downloadedBytes / task.totalBytes) * 100));
       }
       task.updatedAt = Date.now();
-    } catch (err: any) {
+    } catch (err: unknown) {
       task.status = 'failed';
-      task.error = err?.message || '子项下载失败';
+      task.error = err instanceof Error ? err.message : '子项下载失败';
       task.updatedAt = Date.now();
       return;
     }
@@ -200,10 +201,10 @@ async function getResourcePayload(type: DownloadResourceType, id?: string): Prom
   switch (type) {
     case 'conversation': {
       if (!id) throw ApiError.badRequest('缺少 id 参数');
-      const conv = queryOne<any>(db, 'SELECT * FROM conversations WHERE id = ?', [id]);
+      const conv = queryOne<Record<string, unknown>>(db, 'SELECT * FROM conversations WHERE id = ?', [id]);
       if (!conv) throw ApiError.notFound('会话不存在');
-      const messages = queryAll<any>(db, 'SELECT * FROM messages WHERE conversation_id = ?', [id]);
-      const checkpoints = queryAll<any>(db, 'SELECT * FROM checkpoints WHERE conversation_id = ?', [id]);
+      const messages = queryAll<Record<string, unknown>>(db, 'SELECT * FROM messages WHERE conversation_id = ?', [id]);
+      const checkpoints = queryAll<Record<string, unknown>>(db, 'SELECT * FROM checkpoints WHERE conversation_id = ?', [id]);
       const data = { version: 1, exportedAt: Date.now(), scope: 'conversation', conversation: conv, messages, checkpoints };
       return { filename: `conversation-${id}.json`, content: JSON.stringify(data, null, 2) };
     }
@@ -226,12 +227,12 @@ async function getResourcePayload(type: DownloadResourceType, id?: string): Prom
 
     case 'mcp': {
       if (id) {
-        const agent = queryOne<any>(db, 'SELECT * FROM agents WHERE id = ?', [id]);
+        const agent = queryOne<Record<string, unknown>>(db, 'SELECT * FROM agents WHERE id = ?', [id]);
         if (!agent) throw ApiError.notFound('Agent 不存在');
         const configs = safeJsonParse(agent.mcp_json, []);
         return { filename: `mcp-${id}.json`, content: JSON.stringify(configs, null, 2) };
       }
-      const allAgents = queryAll<any>(db, 'SELECT id, name, mcp_json FROM agents');
+      const allAgents = queryAll<Record<string, unknown>>(db, 'SELECT id, name, mcp_json FROM agents');
       const configs = allAgents.map(a => ({ agentId: a.id, name: a.name, mcpServers: safeJsonParse(a.mcp_json, []) }));
       return { filename: 'mcp-configs.json', content: JSON.stringify(configs, null, 2) };
     }
@@ -275,9 +276,9 @@ function packSourceCode(workspaceRoot: string, outPath: string): Promise<void> {
       workspaceRoot,
       '.'
     ];
-    execFile('tar', args, { maxBuffer: 50 * 1024 * 1024 }, (err, stdout, stderr) => {
+    execFile('tar', args, { maxBuffer: 50 * 1024 * 1024 }, (err, _stdout, stderr) => {
       if (err) {
-        console.error('打包源码失败:', stderr);
+        logger.error({ err, stderr }, '打包源码失败');
         reject(err);
         return;
       }

@@ -140,4 +140,176 @@ describe('Error Handling', () => {
       expect(e.code).toBe('not_found');
     }
   });
+
+  it('should handle network errors', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockRejectedValue(new TypeError('Failed to fetch'));
+
+    await expect(api.getAgents()).rejects.toThrow('网络错误');
+  });
+
+  it('should handle timeout errors', async () => {
+    const { API, OrdPawApiError } = await import('../api');
+    const api = new API();
+
+    const abortError = new Error('The operation was aborted');
+    abortError.name = 'AbortError';
+    (global.fetch as any).mockRejectedValue(abortError);
+
+    await expect(api.getAgents()).rejects.toThrow('请求超时');
+  });
+
+  it('should handle non-json responses', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers: { get: () => 'text/plain' },
+      json: async () => ({}),
+      text: async () => 'plain text'
+    });
+
+    const result = await api.getStats();
+    expect(result).toBeUndefined();
+  });
+
+  it('should handle non-json error responses', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue({
+      ok: false,
+      status: 500,
+      statusText: 'Server Error',
+      headers: { get: () => 'text/plain' },
+      json: async () => ({}),
+      text: async () => 'server exploded'
+    });
+
+    await expect(api.getAgents()).rejects.toThrow('server exploded');
+  });
+
+  it('should call agent CRUD endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ id: 'a1', name: 'Agent' }));
+
+    await api.createAgent({ name: 'Agent' });
+    await api.updateAgent('a1', { name: 'Updated' });
+    await api.deleteAgent('a1');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/agents', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith('/api/agents/a1', expect.objectContaining({ method: 'PUT' }));
+    expect(global.fetch).toHaveBeenCalledWith('/api/agents/a1', expect.objectContaining({ method: 'DELETE' }));
+  });
+
+  it('should call conversation endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ id: 'c1', agentId: 'a1' }));
+
+    await api.createConversation('a1', 'Title');
+    await api.getConversation('c1');
+    await api.deleteConversation('c1');
+    await api.sendMessage('c1', 'hello');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/conversations', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith('/api/conversations/c1', expect.anything());
+  });
+
+  it('should call provider endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ id: 'p1' }));
+
+    await api.getProviders();
+    await api.getProviderModels('p1');
+    await api.createProvider({ name: 'P' });
+    await api.updateProvider('p1', { name: 'U' });
+    await api.deleteProvider('p1');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/providers', expect.anything());
+  });
+
+  it('should call settings and stats endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ theme: 'light' }));
+
+    await api.getSettings();
+    await api.updateSettings({ theme: 'dark' });
+    await api.getStats();
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PUT' }));
+    expect(global.fetch).toHaveBeenCalledWith('/api/stats', expect.anything());
+  });
+
+  it('should call skill endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ id: 's1' }));
+
+    await api.getSkills();
+    await api.installSkill({ name: 'skill', code: 'return 1;' } as any);
+    await api.executeSkill('s1', { a: 1 });
+    await api.uninstallSkill('s1');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/skills', expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith('/api/skills/install', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('should call component endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ version: '0.0.3', items: [] }));
+
+    await api.getComponentManifest();
+    await api.getComponentTree();
+    await api.getComponentRelationships();
+    await api.getComponentPlugins();
+    await api.getPluginComponents('plugin');
+    await api.registerComponents('plugin', []);
+    await api.unregisterPluginComponents('plugin');
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/components/manifest', expect.anything());
+  });
+
+  it('should call export/import endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ success: true, imported: [] }));
+
+    await api.exportData('agents');
+    await api.exportConversation('c1');
+    await api.importData({ version: 1 });
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/export?scope=agents', expect.anything());
+    expect(global.fetch).toHaveBeenCalledWith('/api/import', expect.objectContaining({ method: 'POST' }));
+  });
+
+  it('should call clear-data and reset endpoints', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(makeResponse({ success: true, cleared: [] }));
+
+    await api.clearData(['conversations']);
+    await api.resetSettings();
+
+    expect(global.fetch).toHaveBeenCalledWith('/api/clear-data', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith('/api/reset/settings', expect.objectContaining({ method: 'POST' }));
+  });
 });

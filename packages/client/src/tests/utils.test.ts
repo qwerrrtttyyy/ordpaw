@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as utils from '../utils';
 
-const { detectOS, applyOSEffects, getOSAnimationDuration, debounce, throttle, transitionTheme } = utils;
+const { detectOS, applyOSEffects, getOSAnimationDuration, debounce, throttle, transitionTheme, showToast, createModal, prefersReducedMotion } = utils;
 
 describe('OS Detection', () => {
   it('should detect macOS', () => {
@@ -215,5 +215,102 @@ describe('transitionTheme', () => {
     vi.advanceTimersByTime(150);
     expect(document.documentElement.classList.contains('theme-transitioning')).toBe(false);
     vi.useRealTimers();
+  });
+});
+
+describe('detectOS extended', () => {
+  it('detects iOS', () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)',
+      configurable: true
+    });
+    Object.defineProperty(navigator, 'platform', {
+      value: 'iPhone',
+      configurable: true
+    });
+    expect(detectOS()).toBe('ios');
+  });
+
+  it('detects Android', () => {
+    Object.defineProperty(navigator, 'userAgent', {
+      value: 'Mozilla/5.0 (Linux; Android 10)',
+      configurable: true
+    });
+    Object.defineProperty(navigator, 'platform', {
+      value: 'Linux armv8l',
+      configurable: true
+    });
+    expect(detectOS()).toBe('android');
+  });
+});
+
+describe('applyOSEffects all presets', () => {
+  it('applies iOS preset', () => {
+    applyOSEffects('ios');
+    expect(document.documentElement.getAttribute('data-os')).toBe('ios');
+    expect(document.documentElement.style.getPropertyValue('--os-blur-intensity')).toBe('24px');
+  });
+
+  it('applies Android preset', () => {
+    applyOSEffects('android');
+    expect(document.documentElement.getAttribute('data-os')).toBe('android');
+  });
+
+  it('applies unknown preset', () => {
+    applyOSEffects('unknown');
+    expect(document.documentElement.getAttribute('data-os')).toBe('unknown');
+  });
+});
+
+describe('getOSAnimationDuration all cases', () => {
+  it('returns correct values', () => {
+    expect(getOSAnimationDuration('ios')).toBe(320);
+    expect(getOSAnimationDuration('android')).toBe(260);
+  });
+});
+
+describe('showToast', () => {
+  it('creates and removes toast', () => {
+    vi.useFakeTimers();
+    showToast('hello');
+    expect(document.querySelector('.toast')?.textContent).toBe('hello');
+    vi.advanceTimersByTime(2500);
+    expect(document.querySelector('.toast')).toBeNull();
+    vi.useRealTimers();
+  });
+});
+
+describe('createModal', () => {
+  it('creates modal with submit', async () => {
+    const onSubmit = vi.fn(() => true);
+    const { overlay, close } = createModal({
+      title: 'Test',
+      bodyHtml: '<p>body</p>',
+      onSubmit
+    });
+    expect(document.querySelector('.modal-overlay')).toBe(overlay);
+    const confirmBtn = overlay.querySelector('[data-action="confirm"]') as HTMLElement;
+    confirmBtn.click();
+    await new Promise(r => setTimeout(r, 10));
+    expect(onSubmit).toHaveBeenCalled();
+    close();
+    expect(document.querySelector('.modal-overlay')).toBeNull();
+  });
+
+  it('closes modal via cancel', () => {
+    const { overlay } = createModal({ title: 'Test', bodyHtml: '' });
+    const cancelBtn = overlay.querySelector('[data-action="cancel"]') as HTMLElement;
+    cancelBtn.click();
+    expect(document.querySelector('.modal-overlay')).toBeNull();
+  });
+});
+
+describe('prefersReducedMotion', () => {
+  it('returns false when window undefined', () => {
+    const originalWindow = global.window;
+    // @ts-expect-error
+    global.window = undefined;
+    expect(prefersReducedMotion()).toBe(false);
+    global.window = originalWindow;
   });
 });

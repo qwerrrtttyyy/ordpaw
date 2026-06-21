@@ -1,6 +1,7 @@
 import initSqlJs, { Database } from 'sql.js';
 import { mkdirSync, writeFileSync, existsSync, renameSync, readFileSync } from 'fs';
 import { join } from 'path';
+import { logger } from '../core/logger.js';
 
 const dataDir = join(process.cwd(), 'data');
 mkdirSync(dataDir, { recursive: true });
@@ -23,7 +24,7 @@ export async function initDatabase(): Promise<Database> {
       const buffer = readFileSync(dbPath);
       db = new SQL.Database(buffer);
     } catch (err) {
-      console.error('数据库文件读取失败，创建新数据库:', err);
+      logger.error(err, '数据库文件读取失败，创建新数据库:');
       db = new SQL.Database();
     }
   } else if (existsSync(legacyDbPath)) {
@@ -31,9 +32,9 @@ export async function initDatabase(): Promise<Database> {
     try {
       const buffer = readFileSync(legacyDbPath);
       db = new SQL.Database(buffer);
-      console.log('📦 已加载旧版 agent-studio.db，将写入新的 ordpaw.db');
+      logger.info('📦 已加载旧版 agent-studio.db，将写入新的 ordpaw.db');
     } catch (err) {
-      console.error('旧数据库文件读取失败，创建新数据库:', err);
+      logger.error(err, '旧数据库文件读取失败，创建新数据库:');
       db = new SQL.Database();
     }
   } else {
@@ -218,7 +219,7 @@ export async function initDatabase(): Promise<Database> {
   try {
     db.exec(schema);
   } catch (err) {
-    console.error('数据库初始化失败:', err);
+    logger.error(err, '数据库初始化失败:');
     throw err;
   }
 
@@ -248,7 +249,7 @@ function flushSave() {
     renameSync(tempDbPath, dbPath);
     dirty = false;
   } catch (err) {
-    console.error('数据库保存失败:', err);
+    logger.error(err, '数据库保存失败:');
   }
 }
 

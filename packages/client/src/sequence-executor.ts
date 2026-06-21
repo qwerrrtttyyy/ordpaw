@@ -3,8 +3,9 @@
  * 接收后端通过 WebSocket 推送的操作序列并执行
  */
 
-import type { Operation, OperationSequence, OperationResult, OperationType } from '@ordpaw/shared';
+import type { Operation, OperationSequence, OperationResult, OperationType, Settings } from '@ordpaw/shared';
 import { animationManager } from './animation-manager';
+import { logger } from './logger';
 
 interface ExecutionState {
   sequenceId: string;
@@ -17,13 +18,13 @@ interface ExecutionState {
 export class SequenceExecutor {
   private ws: WebSocket | null = null;
   private executionStates = new Map<string, ExecutionState>();
-  private actionHandlers: Map<OperationType, (params: any) => Promise<any>>;
+  private actionHandlers: Map<OperationType, (params: Record<string, unknown>) => Promise<unknown>>;
   private router: { navigate: (route: string) => void };
-  private store: { getSettings: () => any; setSettings: (settings: any) => void };
+  private store: { getSettings: () => Settings; setSettings: (settings: Partial<Settings>) => void };
 
   constructor(
     router: { navigate: (route: string) => void },
-    store: { getSettings: () => any; setSettings: (settings: any) => void }
+    store: { getSettings: () => Settings; setSettings: (settings: Partial<Settings>) => void }
   ) {
     this.router = router;
     this.store = store;
@@ -59,7 +60,7 @@ export class SequenceExecutor {
             break;
         }
       } catch (error) {
-        console.error('[SequenceExecutor] 消息解析失败:', error);
+        logger.error(error, '[SequenceExecutor] 消息解析失败');
       }
     });
   }
@@ -68,7 +69,7 @@ export class SequenceExecutor {
   private handleSequenceStart(payload: { sequence: OperationSequence; estimatedDuration?: number }) {
     const { sequence } = payload;
 
-    console.log(`[SequenceExecutor] 开始执行序列: ${sequence.id}`);
+    logger.info(`[SequenceExecutor] 开始执行序列: ${sequence.id}`);
 
     this.executionStates.set(sequence.id, {
       sequenceId: sequence.id,
@@ -92,11 +93,11 @@ export class SequenceExecutor {
 
     const state = this.executionStates.get(sequenceId);
     if (!state) {
-      console.warn(`[SequenceExecutor] 未找到序列状态: ${sequenceId}`);
+      logger.warn(`[SequenceExecutor] 未找到序列状态: ${sequenceId}`);
       return;
     }
 
-    console.log(`[SequenceExecutor] 执行操作 ${operationIndex + 1}/${totalOperations}: ${operation.type}`);
+    logger.info(`[SequenceExecutor] 执行操作 ${operationIndex + 1}/${totalOperations}: ${operation.type}`);
 
     try {
       const startTime = performance.now();
@@ -119,7 +120,7 @@ export class SequenceExecutor {
         result,
       });
     } catch (error) {
-      console.error(`[SequenceExecutor] 操作执行失败: ${operation.id}`, error);
+      logger.error(error, `[SequenceExecutor] 操作执行失败: ${operation.id}`);
 
       this.sendOperationResult(sequenceId, operation.id, 'failed', 0, undefined, (error as Error).message);
 
@@ -138,8 +139,8 @@ export class SequenceExecutor {
   /** 带重试执行 */
   private async executeWithRetry(
     operation: Operation,
-    handler: (params: any) => Promise<any>
-  ): Promise<any> {
+    handler: (params: Record<string, unknown>) => Promise<unknown>
+  ): Promise<unknown> {
     const maxRetries = operation.retryPolicy?.maxRetries || 0;
     const backoffMs = operation.retryPolicy?.backoffMs || 1000;
 
@@ -148,7 +149,7 @@ export class SequenceExecutor {
         return await this.executeWithTimeout(operation, handler);
       } catch (error) {
         if (attempt === maxRetries) throw error;
-        console.log(`[SequenceExecutor] 操作重试 ${attempt + 1}/${maxRetries}`);
+        logger.info(`[SequenceExecutor] 操作重试 ${attempt + 1}/${maxRetries}`);
         await this.sleep(backoffMs * Math.pow(2, attempt));
       }
     }
@@ -157,8 +158,8 @@ export class SequenceExecutor {
   /** 带超时执行 */
   private async executeWithTimeout(
     operation: Operation,
-    handler: (params: any) => Promise<any>
-  ): Promise<any> {
+    handler: (params: Record<string, unknown>) => Promise<unknown>
+  ): Promise<unknown> {
     const timeout = operation.timeout || 5000;
 
     return Promise.race([
@@ -170,11 +171,14 @@ export class SequenceExecutor {
   }
 
   /** 初始化操作处理器 */
-  private initActionHandlers(): Map<OperationType, (params: any) => Promise<any>> {
-    const handlers = new Map<OperationType, (params: any) => Promise<any>>();
+  private initActionHandlers(): Map<OperationType, (params: Record<string, unknown>) => Promise<unknown>> {
+    const handlers = new Map<OperationType, (params: Record<string, unknown>) => Promise<unknown>>();
+    const addHandler = <T>(type: OperationType, fn: (params: T) => Promise<unknown>) => {
+      addHandler(type, (params: Record<string, unknown>) => fn(params as T));
+    };
 
     // UI 点击
-    handlers.set('ui:click', async (params: { selector: string; waitFor?: number; simulateHover?: boolean }) => {
+    addHandler('ui:click', async (params: { selector: string; waitFor?: number; simulateHover?: boolean }) => {
       const element = await this.waitForElement(params.selector, params.waitFor);
       if (!element) throw new Error(`未找到元素: ${params.selector}`);
 
@@ -189,7 +193,7 @@ export class SequenceExecutor {
     });
 
     // 路由导航
-    handlers.set('ui:navigate', async (params: { route: string; transition?: 'fade' | 'slide' | 'none' }) => {
+    addHandler('ui:navigate', async (params: { route: string; transition?: 'fade' | 'slide' | 'none' }) => {
       this.router.navigate(params.route);
       if (params.transition && params.transition !== 'none') {
         const app = document.getElementById('app');
@@ -203,7 +207,7 @@ export class SequenceExecutor {
     });
 
     // 主题切换
-    handlers.set('ui:theme', async (params: { theme: string; animate?: boolean }) => {
+    addHandler('ui:theme', async (params: { theme: string; animate?: boolean }) => {
       const currentTheme = this.store.getSettings().theme;
       const settings = this.store.getSettings();
       this.store.setSettings({ ...settings, theme: params.theme });
@@ -224,7 +228,7 @@ export class SequenceExecutor {
     });
 
     // 输入填充
-    handlers.set('ui:input', async (params: {
+    addHandler('ui:input', async (params: {
       selector: string;
       value: string;
       clearFirst?: boolean;
@@ -254,7 +258,7 @@ export class SequenceExecutor {
     });
 
     // 滚动
-    handlers.set('ui:scroll', async (params: {
+    addHandler('ui:scroll', async (params: {
       selector?: string;
       position: 'top' | 'bottom' | number;
       smooth?: boolean;
@@ -280,7 +284,7 @@ export class SequenceExecutor {
     });
 
     // 高亮显示
-    handlers.set('ui:highlight', async (params: {
+    addHandler('ui:highlight', async (params: {
       selector: string;
       duration?: number;
       style?: 'pulse' | 'glow' | 'border';
@@ -304,7 +308,7 @@ export class SequenceExecutor {
     });
 
     // 发送聊天消息
-    handlers.set('chat:send', async (params: {
+    addHandler('chat:send', async (params: {
       conversationId: string;
       content: string;
       waitForResponse?: boolean;
@@ -327,7 +331,7 @@ export class SequenceExecutor {
     });
 
     // 播放动画
-    handlers.set('animation:play', async (params: {
+    addHandler('animation:play', async (params: {
       animation: 'fadeIn' | 'fadeOut' | 'slideIn';
       target?: string;
       duration?: number;
@@ -356,7 +360,7 @@ export class SequenceExecutor {
     });
 
     // 显示通知
-    handlers.set('notification:show', async (params: {
+    addHandler('notification:show', async (params: {
       type: 'info' | 'success' | 'warning' | 'error';
       title: string;
       message: string;
@@ -412,7 +416,7 @@ export class SequenceExecutor {
     operationId: string,
     status: 'success' | 'failed' | 'skipped' | 'timeout',
     duration: number,
-    result?: any,
+    result?: unknown,
     error?: string
   ) {
     if (!this.ws) return;
@@ -458,9 +462,9 @@ export class SequenceExecutor {
   }
 
   /** 处理序列完成 */
-  private handleSequenceComplete(payload: { sequenceId: string; summary: any }) {
+  private handleSequenceComplete(payload: { sequenceId: string; summary: unknown }) {
     const { sequenceId, summary } = payload;
-    console.log(`[SequenceExecutor] 序列完成: ${sequenceId}`, summary);
+    logger.info(`[SequenceExecutor] 序列完成: ${sequenceId}`, summary);
     this.executionStates.delete(sequenceId);
   }
 
@@ -469,7 +473,7 @@ export class SequenceExecutor {
     const { sequenceId, status } = payload;
     const state = this.executionStates.get(sequenceId);
     if (state) {
-      state.status = status as any;
+      state.status = status as ExecutionState['status'];
     }
   }
 

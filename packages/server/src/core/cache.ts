@@ -3,7 +3,7 @@ interface CacheEntry<V> {
   expiresAt: number;
 }
 
-export class Cache<V = any> {
+export class Cache<V = unknown> {
   private store = new Map<string, CacheEntry<V>>();
   private defaultTtl: number;
 
@@ -47,6 +47,6 @@ export class Cache<V = any> {
   }
 }
 
-export const statsCache = new Cache<any>(30_000);
-export const providerModelsCache = new Cache< any[]>(60_000);
-export const agentCache = new Cache<any>(60_000);
+export const statsCache = new Cache<unknown>(30_000);
+export const providerModelsCache = new Cache<unknown[]>(60_000);
+export const agentCache = new Cache<import('@ordpaw/shared').Agent>(60_000);

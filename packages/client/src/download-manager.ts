@@ -7,6 +7,7 @@ import type {
   BrowserStorageBackend
 } from '@ordpaw/shared';
 import { API } from './api';
+import { logger } from './logger';
 
 const TASKS_STORAGE_KEY = 'ordpaw_download_tasks_v1';
 const DEFAULT_BROWSER_MAX_BYTES = 500 * 1024 * 1024;
@@ -221,7 +222,7 @@ export class DownloadManager extends EventTarget {
 
   async chooseFileSystemDirectory(): Promise<boolean> {
     try {
-      const picker = (window as any).showDirectoryPicker as () => Promise<FileSystemDirectoryHandle>;
+      const picker = (window as unknown as { showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle> }).showDirectoryPicker;
       if (!picker) return false;
       const handle = await picker();
       this.fsaStorage.setDirectory(handle);
@@ -382,7 +383,7 @@ export class DownloadManager extends EventTarget {
     this.emitTasksChanged();
 
     this.runTask(pending.id).catch(err => {
-      console.error('下载任务执行失败:', err);
+      logger.error(err, '下载任务执行失败');
     });
 
     // 继续调度其他 pending 任务
@@ -406,10 +407,10 @@ export class DownloadManager extends EventTarget {
         task.status = 'completed';
         task.progress = 100;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (task.status !== 'cancelled' && task.status !== 'paused') {
         task.status = 'failed';
-        task.error = err?.message || '下载失败';
+        task.error = err instanceof Error ? err.message : '下载失败';
       }
     } finally {
       state.abortController = undefined;

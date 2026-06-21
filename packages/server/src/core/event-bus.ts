@@ -1,4 +1,5 @@
 import type { EventCallback } from '@ordpaw/shared';
+import { logger } from './logger.js';
 
 class EventBusImpl {
   private listeners: Map<string, Set<EventCallback>> = new Map();
@@ -16,9 +17,9 @@ class EventBusImpl {
     }
   }
 
-  async emit(event: string, payload: any): Promise<void> {
+  async emit(event: string, payload: unknown): Promise<void> {
     const enrichedPayload = payload && typeof payload === 'object'
-      ? { ...payload, __eventMeta: { type: event, time: Date.now() } }
+      ? { ...(payload as Record<string, unknown>), __eventMeta: { type: event, time: Date.now() } }
       : { value: payload, __eventMeta: { type: event, time: Date.now() } };
 
     const targets = [this.listeners.get(event), this.listeners.get('*')];
@@ -29,7 +30,7 @@ class EventBusImpl {
         try {
           await callback(enrichedPayload);
         } catch (error) {
-          console.error(`Event handler error for ${event}:`, error);
+          logger.error(error, `Event handler error for ${event}:`);
         }
       }
     }

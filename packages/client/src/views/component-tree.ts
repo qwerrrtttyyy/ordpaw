@@ -207,12 +207,12 @@ export class ComponentTreeView {
         this.renderTree(filtered);
       }
     } catch (err) {
-      console.error('Failed to load component tree:', err);
+      logger.error(err, 'Failed to load component tree');
       this.showError(t('components.loadError', '加载组件树失败'));
     }
   }
 
-  private renderTree(tree: any) {
+  private renderTree(tree: unknown) {
     const canvas = this.container.querySelector('#tree-canvas') as HTMLElement;
     if (!canvas) return;
 

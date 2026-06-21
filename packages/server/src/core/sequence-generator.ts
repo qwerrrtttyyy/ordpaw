@@ -138,10 +138,14 @@ export class SequenceGenerator {
 
   async generate(
     intent: string,
-    entities: Record<string, any>,
+    entities: Record<string, unknown>,
     context: { conversationId: string; userId: string }
   ): Promise<OperationSequence | null> {
     const operations: Operation[] = [];
+    const getString = (key: string, fallback = ''): string => {
+      const v = entities[key];
+      return typeof v === 'string' ? v : fallback;
+    };
 
     // 根据意图构建操作
     switch (intent) {
@@ -149,14 +153,14 @@ export class SequenceGenerator {
         operations.push({
           id: `op_${++this.idCounter}_${Date.now()}`,
           type: 'ui:navigate',
-          params: { route: entities.route || '#/conversations', transition: 'fade' },
+          params: { route: getString('route', '#/conversations'), transition: 'fade' },
         });
         operations.push({
           id: `op_${++this.idCounter}_${Date.now()}`,
           type: 'chat:send',
           params: {
-            conversationId: entities.conversationId,
-            content: entities.message,
+            conversationId: getString('conversationId'),
+            content: getString('message'),
             waitForResponse: true,
           },
           timeout: 30000,
@@ -164,11 +168,12 @@ export class SequenceGenerator {
         });
         break;
 
-      case 'theme_switch':
+      case 'theme_switch': {
+        const theme = getString('theme');
         operations.push({
           id: `op_${++this.idCounter}_${Date.now()}`,
           type: 'ui:theme',
-          params: { theme: entities.theme, animate: true },
+          params: { theme, animate: true },
         });
         operations.push({
           id: `op_${++this.idCounter}_${Date.now()}`,
@@ -176,12 +181,13 @@ export class SequenceGenerator {
           params: {
             type: 'success',
             title: '主题已切换',
-            message: `已为您切换到${entities.theme === 'ordpaw-dark' ? '深色' : '浅色'}主题`,
+            message: `已为您切换到${theme === 'ordpaw-dark' ? '深色' : '浅色'}主题`,
             duration: 2000,
           },
           dependsOn: [operations[0].id],
         });
         break;
+      }
 
       case 'onboarding':
         operations.push({

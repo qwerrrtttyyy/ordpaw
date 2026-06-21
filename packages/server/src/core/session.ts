@@ -4,6 +4,25 @@ import { getDatabase, saveDatabase } from '../db/index.js';
 import { checkpointManager } from './checkpoint.js';
 import { eventBus } from './event-bus.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { logger } from './logger.js';
+
+interface ConversationRow {
+  id: string;
+  agent_id: string;
+  title: string;
+  variables_json: string;
+  created_at: number;
+  updated_at: number;
+}
+
+interface MessageRow {
+  id: string;
+  conversation_id: string;
+  role: Message['role'];
+  content: string;
+  metadata_json: string;
+  timestamp: number;
+}
 
 export class SessionManager {
   createConversation(agentId: string, title?: string): Conversation {
@@ -25,10 +44,10 @@ export class SessionManager {
   getConversation(id: string): Conversation | null {
     try {
       const db = getDatabase();
-      const conv = queryOne<any>(db, 'SELECT * FROM conversations WHERE id = ?', [id]);
+      const conv = queryOne<ConversationRow>(db, 'SELECT * FROM conversations WHERE id = ?', [id]);
       if (!conv) return null;
 
-      const msgRows = queryAll<any>(
+      const msgRows = queryAll<MessageRow>(
         db,
         'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC, id ASC',
         [id]
@@ -38,7 +57,7 @@ export class SessionManager {
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp,
-        metadata: safeJsonParse(msg.metadata_json, {})
+        metadata: safeJsonParse<Record<string, unknown>>(msg.metadata_json, {})
       }));
 
       const checkpoints = checkpointManager.getCheckpoints(id);
@@ -49,12 +68,12 @@ export class SessionManager {
         title: conv.title,
         messages,
         checkpoints,
-        variables: safeJsonParse(conv.variables_json, {}),
+        variables: safeJsonParse<Record<string, unknown>>(conv.variables_json, {}),
         createdAt: conv.created_at,
         updatedAt: conv.updated_at
       };
     } catch (err) {
-      console.error('getConversation 错误:', err);
+      logger.error(err, 'getConversation 错误:');
       return null;
     }
   }
@@ -63,25 +82,25 @@ export class SessionManager {
     try {
       const db = getDatabase();
       const rows = agentId
-        ? queryAll<any>(db, 'SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
-        : queryAll<any>(db, 'SELECT * FROM conversations ORDER BY updated_at DESC');
+        ? queryAll<ConversationRow>(db, 'SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
+        : queryAll<ConversationRow>(db, 'SELECT * FROM conversations ORDER BY updated_at DESC');
       return rows.map(conv => ({
         id: conv.id,
         agentId: conv.agent_id,
         title: conv.title,
         messages: [],
         checkpoints: [],
-        variables: safeJsonParse(conv.variables_json, {}),
+        variables: safeJsonParse<Record<string, unknown>>(conv.variables_json, {}),
         createdAt: conv.created_at,
         updatedAt: conv.updated_at
       }));
     } catch (err) {
-      console.error('listConversations 错误:', err);
+      logger.error(err, 'listConversations 错误:');
       return [];
     }
   }
 
-  addMessage(conversationId: string, role: Message['role'], content: string, metadata?: Record<string, any>): Message {
+  addMessage(conversationId: string, role: Message['role'], content: string, metadata?: Record<string, unknown>): Message {
     const db = getDatabase();
     const message: Message = {
       id: uuidv4(),
@@ -115,12 +134,12 @@ export class SessionManager {
       eventBus.emit('conversation:deleted', { id });
       return true;
     } catch (err) {
-      console.error('deleteConversation 错误:', err);
+      logger.error(err, 'deleteConversation 错误:');
       return false;
     }
   }
 
-  updateVariables(conversationId: string, variables: Record<string, any>): boolean {
+  updateVariables(conversationId: string, variables: Record<string, unknown>): boolean {
     try {
       const db = getDatabase();
       const existing = db.exec('SELECT id FROM conversations WHERE id = ?', [conversationId]);
@@ -132,7 +151,7 @@ export class SessionManager {
       saveDatabase();
       return true;
     } catch (err) {
-      console.error('updateVariables 错误:', err);
+      logger.error(err, 'updateVariables 错误:');
       return false;
     }
   }

@@ -28,7 +28,7 @@ export interface Provider {
   models: ModelInfo[];
   enabled: boolean;
   isBuiltIn: boolean;
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
 }
@@ -40,7 +40,7 @@ export interface CreateProviderRequest {
   apiKey?: string;
   apiKeyName?: string;
   models?: ModelInfo[];
-  config?: Record<string, any>;
+  config?: Record<string, unknown>;
 }
 
 // === 会话 ===
@@ -50,7 +50,7 @@ export interface Conversation {
   title: string;
   messages: Message[];
   checkpoints: Checkpoint[];
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
 }
@@ -60,7 +60,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system' | 'tool';
   content: string;
   timestamp: number;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 // === 检查点 ===
@@ -70,7 +70,7 @@ export interface Checkpoint {
   messageId: string;
   state: {
     messages: Message[];
-    variables: Record<string, any>;
+    variables: Record<string, unknown>;
   };
   label?: string;
   createdAt: number;
@@ -84,7 +84,7 @@ export interface TestCase {
   input: string;
   expectedOutput?: string;
   expectedContains?: string[];
-  variables?: Record<string, any>;
+  variables?: Record<string, unknown>;
   createdAt: number;
   updatedAt: number;
 }
@@ -140,7 +140,7 @@ export interface ComponentContribution {
   name: string;
   src: string;
   slot?: 'header' | 'sidebar' | 'dashboard' | 'settings' | 'view' | string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   animation?: ComponentAnimation;
 }
 
@@ -156,7 +156,7 @@ export interface PluginManifest {
 
 export interface ConfigField {
   type: 'string' | 'number' | 'boolean';
-  default?: any;
+  default?: unknown;
   description?: string;
 }
 
@@ -164,17 +164,24 @@ export interface PluginInstance {
   id: string;
   manifest: PluginManifest;
   enabled: boolean;
-  config: Record<string, any>;
+  config: Record<string, unknown>;
   state: 'loaded' | 'error' | 'disabled';
 }
 
+export interface InstallPluginRequest {
+  name: string;
+  version?: string;
+  description?: string;
+  manifest: PluginManifest;
+}
+
 // === 事件总线 ===
-export type EventCallback = (payload: any) => void | Promise<void>;
+export type EventCallback = (payload: unknown) => void | Promise<void>;
 
 export interface EventBus {
   on(event: string, callback: EventCallback): void;
   off(event: string, callback: EventCallback): void;
-  emit(event: string, payload: any): Promise<void>;
+  emit(event: string, payload: unknown): Promise<void>;
 }
 
 // === MCP 服务端（持久化） ===
@@ -204,7 +211,7 @@ export interface InstalledSkill {
   id: string;
   name: string;
   description: string;
-  parameters: Record<string, any>;
+  parameters: Record<string, unknown>;
   code: string;
   source: 'builtin' | 'user';
   enabled: boolean;
@@ -216,7 +223,7 @@ export interface InstallSkillRequest {
   name: string;
   description?: string;
   code: string;
-  parameters?: Record<string, any>;
+  parameters?: Record<string, unknown>;
 }
 
 export interface SkillInstallResult {
@@ -228,7 +235,7 @@ export interface SkillInstallResult {
 
 export interface SkillExecuteResult {
   success: boolean;
-  output?: any;
+  output?: unknown;
   error?: string;
 }
 
@@ -237,15 +244,15 @@ export interface SkillDefinition {
   id: string;
   name: string;
   description: string;
-  parameters: any;
-  returns?: any;
-  execute: (params: any, context: SkillContext) => Promise<any>;
+  parameters: unknown;
+  returns?: unknown;
+  execute: (params: unknown, context: SkillContext) => Promise<unknown>;
 }
 
 export interface SkillContext {
   conversationId: string;
   agentId: string;
-  variables: Record<string, any>;
+  variables: Record<string, unknown>;
 }
 
 // === MCP ===
@@ -283,14 +290,14 @@ export interface DebugLogEntry {
   level: 'debug' | 'info' | 'warn' | 'error';
   message: string;
   source?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DebugEventEntry {
   id: string;
   time: number;
   type: string;
-  payload: any;
+  payload: unknown;
 }
 
 export type ThemeId = 'ordpaw-light' | 'ordpaw-dark' | 'ordpaw-twilight' | 'minimal' | 'forest' | 'ocean' | 'neon' | 'material';
@@ -332,7 +339,7 @@ export interface Script {
 
 export interface ScriptExecutionResult {
   success: boolean;
-  output?: any;
+  output?: unknown;
   error?: string;
   logs: string[];
   duration: number;
@@ -340,7 +347,7 @@ export interface ScriptExecutionResult {
 
 export interface ScriptToolCall {
   tool: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
 }
 
 export interface ThemeConfig {
@@ -382,7 +389,7 @@ export interface DownloadItem {
   name?: string;
   /** 预估字节数，用于前端配额预检 */
   size?: number;
-  meta?: Record<string, any>;
+  meta?: Record<string, unknown>;
 }
 
 export interface DownloadTask {
@@ -463,14 +470,14 @@ export interface UpdateScriptRequest {
 }
 
 export interface ExecuteScriptRequest {
-  args?: Record<string, any>;
-  context?: Record<string, any>;
+  args?: Record<string, unknown>;
+  context?: Record<string, unknown>;
 }
 
 export interface ScriptTool {
   name: string;
   description: string;
-  parameters: any;
+  parameters: unknown;
 }
 
 // === 自动操作序列 ===
@@ -490,7 +497,7 @@ export type OperationType =
 export interface Operation {
   id: string;
   type: OperationType;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
   timeout?: number;
   retryPolicy?: {
     maxRetries: number;
@@ -518,5 +525,46 @@ export interface OperationResult {
   status: 'success' | 'failed' | 'skipped' | 'timeout';
   duration: number;
   error?: string;
-  result?: any;
+  result?: unknown;
+}
+
+// === 统计 / 组件树响应 ===
+export interface StatsResponse {
+  agents: number;
+  conversations: number;
+  plugins: number;
+  prompts: number;
+  scripts: number;
+  skills: number;
+  installedSkills: number;
+  mcpServers: number;
+  providers: number;
+  testSuites: number;
+}
+
+export interface ComponentTreeNode {
+  id: string;
+  name: string;
+  type: string;
+  src: string;
+  slot?: string;
+  plugin: string;
+  children: ComponentTreeNode[];
+  parent?: string;
+  metadata: Record<string, unknown>;
+}
+
+export interface ComponentTreeResponse {
+  root: ComponentTreeNode[];
+  relationships: Array<{ from: string; to: string }>;
+}
+
+export interface ComponentPluginsResponse {
+  plugins: string[];
+  stats: {
+    totalComponents: number;
+    totalPlugins: number;
+    byType: Record<string, number>;
+    byPlugin: Record<string, number>;
+  };
 }
