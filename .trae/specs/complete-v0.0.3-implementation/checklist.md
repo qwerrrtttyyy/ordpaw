@@ -1,0 +1,11 @@
+- [x] 前端组件服务器 `ComponentServerImpl` 已实现并导出
+- [x] 后端组件服务器 REST 路由 `/api/components/*` 可用
+- [x] `detectOS` 能识别 macOS/Windows/Linux/iOS/Android/unknown
+- [x] `applyOSEffects` 为每个 OS 设置正确的 CSS 变量
+- [x] `OrdPawApiError` 包含 status、code、details
+- [x] API 缓存 TTL 与并发去重工作正常
+- [x] `styles-elegant.css` 包含完整设计系统变量与类
+- [x] 所有子包 `package.json` 版本为 `0.0.3`
+- [x] `app.ts` 中 `window.__ordpaw.version` 为 `0.0.3`
+- [x] TypeScript 类型检查 0 错误
+- [x] 测试套件 47/47 通过

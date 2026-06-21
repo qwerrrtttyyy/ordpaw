@@ -461,9 +461,7 @@ export function setupApiRoutes(app: any) {
   }));
 
   // ============ 组件 API ============
-  router.get('/components/manifest', asyncHandler(async (_req: Request, res: Response) => {
-    res.json(componentServer.getManifest());
-  }));
+  router.use('/components', componentServer.getRouter());
 
   // ============ 下载 API ============
   setupDownloadRoutes(router);
