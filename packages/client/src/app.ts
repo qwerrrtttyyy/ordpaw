@@ -141,7 +141,7 @@ export class App {
 
       this.ws.onopen = () => {
         console.log('[App] WebSocket 已连接');
-        window.__ordpaw = { ws: this.ws!, version: '0.0.2', OrdPaw: (window as any).OrdPaw };
+        window.__ordpaw = { ws: this.ws!, version: '0.0.3', OrdPaw: (window as any).OrdPaw };
         this.sequenceExecutor = new SequenceExecutor(this.router, this.store);
         this.sequenceExecutor.connect(this.ws!);
       };
