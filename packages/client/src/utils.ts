@@ -5,10 +5,6 @@
 
 /**
  * Escape HTML special characters in a string for safe insertion as text content.
- *
- * Uses the DOM-based approach (textContent → innerHTML) which is safer than
- * regex-based escaping because it handles all edge cases including quotes
- * inside attribute values and never misses an entity.
  */
 export function escapeHtml(text: unknown): string {
   if (text === null || text === undefined) return '';
@@ -18,8 +14,50 @@ export function escapeHtml(text: unknown): string {
 }
 
 /**
+ * 防抖函数 - 延迟执行以避免频繁调用
+ */
+export function debounce<T extends (...args: any[]) => any>(
+  fn: T,
+  delay: number = 200
+): (...args: Parameters<T>) => void {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  return (...args: Parameters<T>) => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+/**
+ * 节流函数 - 限制单位时间内的执行次数
+ */
+export function throttle<T extends (...args: any[]) => any>(
+  fn: T,
+  limit: number = 100
+): (...args: Parameters<T>) => void {
+  let inThrottle = false;
+  return (...args: Parameters<T>) => {
+    if (!inThrottle) {
+      fn(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
+}
+
+/**
+ * 带过渡动画的主题切换
+ */
+export function transitionTheme(apply: () => void, duration: number = 300): void {
+  const html = document.documentElement;
+  html.classList.add('theme-transitioning');
+  apply();
+  setTimeout(() => {
+    html.classList.remove('theme-transitioning');
+  }, duration);
+}
+
+/**
  * Format a timestamp as a relative time string.
- * Locale-aware: uses zh-CN strings for 'zh-CN' locale, English otherwise.
  */
 export function formatRelativeTime(timestamp: number, locale: 'zh-CN' | 'en-US' = 'zh-CN'): string {
   const now = Date.now();
@@ -44,7 +82,6 @@ export function formatRelativeTime(timestamp: number, locale: 'zh-CN' | 'en-US' 
 
 /**
  * Show a transient toast notification at the bottom of the screen.
- * Auto-removes after 2.4s.
  */
 export function showToast(message: string, durationMs = 2400): void {
   const t = document.createElement('div');
@@ -56,9 +93,6 @@ export function showToast(message: string, durationMs = 2400): void {
 
 /**
  * Build a modal overlay element appended to document.body.
- * Returns the overlay element and a close() function.
- *
- * Used to deduplicate the createModal() pattern across views.
  */
 export function createModal(opts: {
   title: string;
@@ -97,4 +131,72 @@ export function createModal(opts: {
   }
 
   return { overlay, close };
+}
+
+/**
+ * 检测操作系统类型
+ */
+export type OSType = 'windows' | 'macos' | 'linux' | 'unknown';
+
+export function detectOS(): OSType {
+  if (typeof navigator === 'undefined') return 'unknown';
+  const ua = navigator.userAgent.toLowerCase();
+  if (ua.includes('win')) return 'windows';
+  if (ua.includes('mac')) return 'macos';
+  if (ua.includes('linux')) return 'linux';
+  return 'unknown';
+}
+
+/**
+ * 应用操作系统特定的样式效果
+ */
+export function applyOSEffects(os: OSType) {
+  const root = document.documentElement;
+  root.setAttribute('data-os', os);
+
+  switch (os) {
+    case 'macos':
+      root.style.setProperty('--os-blur-intensity', '20px');
+      root.style.setProperty('--os-shadow-soft', '0 8px 32px rgba(0, 0, 0, 0.12)');
+      root.style.setProperty('--os-animation-curve', 'cubic-bezier(0.4, 0, 0.2, 1)');
+      root.style.setProperty('--os-border-radius', '12px');
+      break;
+    case 'windows':
+      root.style.setProperty('--os-blur-intensity', '10px');
+      root.style.setProperty('--os-shadow-soft', '0 4px 16px rgba(0, 0, 0, 0.15)');
+      root.style.setProperty('--os-animation-curve', 'cubic-bezier(0, 0, 1, 1)');
+      root.style.setProperty('--os-border-radius', '4px');
+      break;
+    case 'linux':
+      root.style.setProperty('--os-blur-intensity', '15px');
+      root.style.setProperty('--os-shadow-soft', '0 6px 24px rgba(0, 0, 0, 0.1)');
+      root.style.setProperty('--os-animation-curve', 'cubic-bezier(0.25, 0.1, 0.25, 1)');
+      root.style.setProperty('--os-border-radius', '8px');
+      break;
+    default:
+      root.style.setProperty('--os-blur-intensity', '12px');
+      root.style.setProperty('--os-shadow-soft', '0 4px 20px rgba(0, 0, 0, 0.1)');
+      root.style.setProperty('--os-animation-curve', 'ease-out');
+      root.style.setProperty('--os-border-radius', '8px');
+  }
+}
+
+/**
+ * 获取操作系统特定的动画持续时间
+ */
+export function getOSAnimationDuration(os: OSType): number {
+  switch (os) {
+    case 'macos': return 400;
+    case 'windows': return 250;
+    case 'linux': return 300;
+    default: return 300;
+  }
+}
+
+/**
+ * 检测用户是否偏好减少动画
+ */
+export function prefersReducedMotion(): boolean {
+  if (typeof window === 'undefined') return false;
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
