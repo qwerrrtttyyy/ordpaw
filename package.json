@@ -8,12 +8,18 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm -r dev",
-    "build": "pnpm -r build",
-    "dev:server": "pnpm --filter @ordpaw/server dev",
-    "dev:client": "pnpm --filter @ordpaw/client dev"
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "typecheck": "turbo run typecheck",
+    "start": "turbo run start",
+    "dev:server": "turbo run dev --filter=@ordpaw/server",
+    "dev:client": "turbo run dev --filter=@ordpaw/client"
   },
   "engines": {
     "node": ">=18.0.0"
+  },
+  "packageManager": "pnpm@10.28.1",
+  "devDependencies": {
+    "turbo": "^2.9.18"
   }
 }

@@ -207,6 +207,16 @@ class SkillRunner {
     return this.skills.get(id);
   }
 
+  /**
+   * 注册插件贡献的技能
+   */
+  registerSkill(skill: SkillDefinition): void {
+    if (!skill || !skill.id || !skill.name || typeof skill.execute !== 'function') {
+      throw new Error('技能定义无效：必须包含 id、name 和 execute 函数');
+    }
+    this.skills.set(skill.id, skill);
+  }
+
   private safeJsonParse(val: any, def: any): any {
     if (!val) return def;
     try { return JSON.parse(val); } catch { return def; }

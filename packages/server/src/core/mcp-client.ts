@@ -1,5 +1,6 @@
 import type { McpServer, McpConfig, InstallMcpRequest } from '@ordpaw/shared';
 import { v4 as uuidv4 } from 'uuid';
+import type { SqlValue } from 'sql.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 
 class McpClient {
@@ -129,7 +130,7 @@ class McpClient {
     const result = db.exec('SELECT * FROM mcp_servers ORDER BY created_at DESC');
     if (result.length === 0) return [];
     const { columns, values } = result[0];
-    return values.map(row => {
+    return values.map((row: SqlValue[]) => {
       const idx = (c: string) => columns.indexOf(c);
       return {
         id: row[idx('id')] as string,

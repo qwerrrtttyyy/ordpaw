@@ -127,15 +127,36 @@ OrdPaw is a full-stack AI Agent development and debugging platform. The codebase
 4. Plugin loader calls a non-existent `skillRunner.registerSkill`, so any plugin registering a skill will crash at runtime.
 5. Client plugin registry references an undefined `pluginRegistry`, breaking `window.OrdPaw` initialization.
 
+## Fixes Applied (2026-06-21)
+| # | Issue | Fix | File(s) |
+|---|-------|-----|---------|
+| 1 | Server build 8 TS errors | Added sql.js declaration; typed `SqlValue[]` callbacks; implemented `SkillRunner.registerSkill` | `types/sql.js.d.ts`, `api/index.ts`, `mcp-client.ts`, `skill-runner.ts` |
+| 2 | Client build 3 TS errors | Implemented `PluginRegistry` class; fixed `ChatView.conversation` assignment | `plugin-registry.ts`, `views/chat.ts` |
+| 3 | Export filename regression | Renamed `agent-studio-export` → `ordpaw-export` | `api/index.ts` |
+| 4 | Event-bus memory leak | `off()` now deletes empty listener sets | `event-bus.ts` |
+| 5 | Hardcoded crypto secret | Removed default fallback; throws if `ORDPAW_DB_SECRET` unset | `api-key-crypto.ts` |
+| 6 | Wide-open CORS | Added configurable `ORDPAW_CORS_ORIGIN` allowlist | `index.ts` |
+| 7 | Dynamic SQL in import | Added table/column allowlist validation | `api/index.ts` |
+| 8 | Dynamic SET clauses | Added `buildUpdateSet` helper with allowlist; refactored 3 managers | `db/utils.ts`, `agent-runtime.ts`, `provider-service.ts`, `test-suite.ts` |
+| 9 | Turborepo migration | Installed turbo, added `turbo.json`, `packageManager`, `typecheck` scripts, `.gitignore` | `package.json`, `turbo.json`, `packages/*/package.json`, `.gitignore` |
+
+## Remaining Work (not addressed)
+- **Authentication/authorization** — still no user/session gate.
+- **Script sandbox hardening** — `node:vm` remains best-effort; true isolation needs worker process refactor.
+- **Performance limits** — conversation history cap, pagination, export streaming still not implemented.
+- **Tests** — no unit/integration tests yet.
+- **Graceful shutdown race** — `uncaughtException` handler still prevents crash exit.
+
 ## Prioritized Action Plan
-1. **Fix server build** — add `@types/sql.js`, type callback parameters, implement `SkillRunner.registerSkill`.
-2. **Fix client build** — define `pluginRegistry` in `plugin-registry.ts`, initialize `conversation` safely in `ChatView`.
-3. **Add tests** — start with core services (session, checkpoint, provider-service) and API smoke tests.
-4. **Harden auth & CORS** — even a simple token/session gate would raise the bar.
-5. **Remove default crypto secret** — fail fast if `ORDPAW_DB_SECRET` is missing.
-6. **Cap conversation history** — biggest user-facing latency win.
-7. **Add pagination** — prevents accidental OOM on large datasets.
-8. **Sanitize dynamic SQL** — allowlist table/column names and `SET` fields.
+1. ~~**Fix server build**~~ ✓
+2. ~~**Fix client build**~~ ✓
+3. ~~**Remove default crypto secret**~~ ✓
+4. ~~**Harden CORS & dynamic SQL**~~ ✓
+5. **Add tests** — start with core services (session, checkpoint, provider-service) and API smoke tests.
+6. **Add authentication** — even a simple token/session gate would raise the bar.
+7. **Cap conversation history** — biggest user-facing latency win.
+8. **Add pagination** — prevents accidental OOM on large datasets.
+9. **Sandbox isolation** — move script/skill execution to worker process or VM2 alternative.
 
 ## Decisions Made During Analysis
 | Decision | Rationale |

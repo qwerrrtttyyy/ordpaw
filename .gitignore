@@ -7,3 +7,4 @@ dist
 data/
 plugins/
 *.tsbuildinfo
+.turbo

@@ -68,3 +68,29 @@ export function safeCount(
   const v = result[0].values[0][0];
   return typeof v === 'number' ? v : Number(v) || 0;
 }
+
+/**
+ * Build a safe UPDATE SET clause from an allowed column map.
+ * Only columns explicitly listed in `allowed` are included in the generated SQL.
+ * Returns { sql: string, params: any[] } or null when there is nothing to update.
+ */
+export function buildUpdateSet(
+  updates: Record<string, any>,
+  allowed: Record<string, string>,
+  extra: Record<string, any> = {}
+): { sql: string; params: any[] } | null {
+  const setParts: string[] = [];
+  const params: any[] = [];
+  for (const [key, value] of Object.entries(updates)) {
+    const col = allowed[key];
+    if (col === undefined) continue;
+    setParts.push(`${col} = ?`);
+    params.push(value);
+  }
+  for (const [col, value] of Object.entries(extra)) {
+    setParts.push(`${col} = ?`);
+    params.push(value);
+  }
+  if (setParts.length === 0) return null;
+  return { sql: setParts.join(', '), params };
+}

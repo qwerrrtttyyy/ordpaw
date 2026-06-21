@@ -1,3 +1,26 @@
+class PluginRegistry {
+  private settingsGetter: (() => Record<string, any>) | null = null;
+
+  setSettingsGetter(getter: () => Record<string, any>) {
+    this.settingsGetter = getter;
+  }
+
+  api() {
+    const getSettings = () => this.settingsGetter?.() ?? {};
+    return {
+      get settings() {
+        return getSettings();
+      },
+      getSetting: (key: string, defaultValue?: any) => {
+        const settings = getSettings();
+        return key in settings ? settings[key] : defaultValue;
+      },
+    };
+  }
+}
+
+export const pluginRegistry = new PluginRegistry();
+
 export function installGlobalPluginApi(settingsGetter: () => Record<string, any>) {
   pluginRegistry.setSettingsGetter(settingsGetter);
   const api = pluginRegistry.api();

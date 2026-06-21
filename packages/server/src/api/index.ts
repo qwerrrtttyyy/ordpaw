@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import type { SqlValue } from 'sql.js';
 import { agentRuntime } from '../core/agent-runtime.js';
 import { sessionManager } from '../core/session.js';
 import { checkpointManager } from '../core/checkpoint.js';
@@ -325,7 +326,7 @@ export function setupApiRoutes(app: any) {
       return;
     }
     const { columns, values } = result[0];
-    const prompts = values.map(row => {
+    const prompts = values.map((row: SqlValue[]) => {
       const p = rowToObject(columns, row);
       return {
         id: p.id,
@@ -405,7 +406,7 @@ export function setupApiRoutes(app: any) {
       return;
     }
     const { columns, values } = result[0];
-    const plugins = values.map(row => {
+    const plugins = values.map((row: SqlValue[]) => {
       const p = rowToObject(columns, row);
       return {
         id: p.id,
@@ -474,7 +475,7 @@ export function setupApiRoutes(app: any) {
     const result = db.exec('SELECT * FROM settings');
     const settingsObj: any = { ...DEFAULT_SETTINGS };
     if (result.length > 0) {
-      result[0].values.forEach(row => {
+      result[0].values.forEach((row: SqlValue[]) => {
         const key = row[0] as string;
         const value = safeJsonParse(row[1], null);
         if (value !== null) {
@@ -647,7 +648,7 @@ export function setupApiRoutes(app: any) {
     const queryAll = (sql: string) => {
       const result = db.exec(sql);
       if (result.length === 0) return [];
-      return result[0].values.map(row => rowToObject(result[0].columns, row));
+      return result[0].values.map((row: SqlValue[]) => rowToObject(result[0].columns, row));
     };
 
     if (scope === 'all' || scope === 'agents') {
@@ -685,7 +686,7 @@ export function setupApiRoutes(app: any) {
       data.installedSkills = queryAll('SELECT * FROM installed_skills');
     }
 
-    res.setHeader('Content-Disposition', `attachment; filename="agent-studio-export-${Date.now()}.json"`);
+    res.setHeader('Content-Disposition', `attachment; filename="ordpaw-export-${Date.now()}.json"`);
     res.json(data);
   }));
 
@@ -698,7 +699,7 @@ export function setupApiRoutes(app: any) {
     const queryAll = (sql: string, params?: any[]) => {
       const result = params ? db.exec(sql, params) : db.exec(sql);
       if (result.length === 0) return [];
-      return result[0].values.map(row => rowToObject(result[0].columns, row));
+      return result[0].values.map((row: SqlValue[]) => rowToObject(result[0].columns, row));
     };
 
     const data = {
@@ -721,7 +722,29 @@ export function setupApiRoutes(app: any) {
 
     const imported: string[] = [];
 
+    const TABLE_COLUMNS: Record<string, string[]> = {
+      agents: ['id','name','description','system_prompt','provider_id','model','skills_json','mcp_json','created_at','updated_at'],
+      providers: ['id','name','type','base_url','api_key_name','api_key','models_json','enabled','is_built_in','config_json','created_at','updated_at'],
+      conversations: ['id','agent_id','title','variables_json','created_at','updated_at'],
+      messages: ['id','conversation_id','role','content','metadata_json','timestamp'],
+      checkpoints: ['id','conversation_id','message_id','state_json','label','created_at'],
+      prompts: ['id','name','category','content','variables_json','version','created_at','updated_at'],
+      scripts: ['id','name','description','code','language','created_at','updated_at'],
+      settings: ['key','value_json'],
+      test_suites: ['id','agent_id','name','description','created_at','updated_at'],
+      test_cases: ['id','suite_id','name','input','expected_output','expected_contains_json','variables_json','created_at','updated_at'],
+      test_runs: ['id','suite_id','agent_id','results_json','passed','failed','created_at'],
+      plugins: ['id','name','version','description','manifest_json','config_json','state','enabled'],
+      mcp_servers: ['id','name','transport','command','url','env_json','enabled','connected','created_at','updated_at'],
+      installed_skills: ['id','name','description','parameters_json','code','source','enabled','created_at','updated_at'],
+    };
+
     const insertIf = (table: string, rows: any[], cols: string[]) => {
+      const allowedCols = TABLE_COLUMNS[table];
+      if (!allowedCols) throw ApiError.badRequest(`导入目标表不在允许列表中: ${table}`);
+      if (!cols.every(c => allowedCols.includes(c))) {
+        throw ApiError.badRequest(`导入列包含不允许的字段: ${cols.filter(c => !allowedCols.includes(c)).join(', ')}`);
+      }
       if (!rows || !Array.isArray(rows) || rows.length === 0) return;
       for (const row of rows) {
         const vals = cols.map(c => {

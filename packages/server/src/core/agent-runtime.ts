@@ -7,7 +7,7 @@ import { eventBus } from './event-bus.js';
 import { debugLogger } from './debug-logger.js';
 import { providerService } from './provider-service.js';
 import { agentCache } from './cache.js';
-import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { queryAll, queryOne, safeJsonParse, buildUpdateSet } from '../db/utils.js';
 
 /**
  * Resolve the effective API key for a provider.
@@ -278,43 +278,27 @@ export class AgentRuntime {
     if (!agent) return null;
 
     const db = getDatabase();
-    const updates: string[] = [];
-    const params: any[] = [];
+    const updates: Record<string, any> = {};
+    if (data.name !== undefined) updates.name = data.name.toString();
+    if (data.description !== undefined) updates.description = (data.description || '').toString();
+    if (data.systemPrompt !== undefined) updates.systemPrompt = (data.systemPrompt || '').toString();
+    if (data.providerId !== undefined) updates.providerId = data.providerId.toString();
+    if (data.model !== undefined) updates.model = data.model.toString();
+    if (data.skills !== undefined) updates.skills = JSON.stringify(data.skills);
+    if (data.mcpServers !== undefined) updates.mcpServers = JSON.stringify(data.mcpServers);
 
-    if (data.name !== undefined) {
-      updates.push('name = ?');
-      params.push(data.name.toString());
-    }
-    if (data.description !== undefined) {
-      updates.push('description = ?');
-      params.push((data.description || '').toString());
-    }
-    if (data.systemPrompt !== undefined) {
-      updates.push('system_prompt = ?');
-      params.push((data.systemPrompt || '').toString());
-    }
-    if (data.providerId !== undefined) {
-      updates.push('provider_id = ?');
-      params.push(data.providerId.toString());
-    }
-    if (data.model !== undefined) {
-      updates.push('model = ?');
-      params.push(data.model.toString());
-    }
-    if (data.skills !== undefined) {
-      updates.push('skills_json = ?');
-      params.push(JSON.stringify(data.skills));
-    }
-    if (data.mcpServers !== undefined) {
-      updates.push('mcp_json = ?');
-      params.push(JSON.stringify(data.mcpServers));
-    }
+    const set = buildUpdateSet(updates, {
+      name: 'name',
+      description: 'description',
+      systemPrompt: 'system_prompt',
+      providerId: 'provider_id',
+      model: 'model',
+      skills: 'skills_json',
+      mcpServers: 'mcp_json',
+    }, { updated_at: Date.now() });
 
-    if (updates.length > 0) {
-      updates.push('updated_at = ?');
-      params.push(Date.now());
-      params.push(id);
-      db.run(`UPDATE agents SET ${updates.join(', ')} WHERE id = ?`, params);
+    if (set) {
+      db.run(`UPDATE agents SET ${set.sql} WHERE id = ?`, [...set.params, id]);
       saveDatabase();
       agentCache.delete(id);
     }

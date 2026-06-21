@@ -43,26 +43,56 @@ Complete
 - [x] Deliver to user
 - **Status:** complete
 
+### Phase 6: Build & Runtime Bug Fixes
+- [x] Fix server TypeScript errors (missing types, implicit any, registerSkill)
+- [x] Fix client TypeScript errors (pluginRegistry, chat view initialization)
+- [x] Fix export filename regression
+- [x] Fix event-bus memory leak and other runtime defects
+- [x] Run type checks and full build to verify
+- **Status:** complete
+
+### Phase 7: Security & Architecture Hardening
+- [x] Remove hardcoded default crypto secret
+- [x] Restrict CORS to configurable origins
+- [x] Add allowlist validation for dynamic SQL table/column names
+- [x] Add allowlist validation for dynamic SET clauses
+- **Status:** complete
+
+### Phase 8: Introduce Turborepo
+- [x] Add `turbo.json` with tasks for typecheck, build, dev, start
+- [x] Update root `package.json` scripts to use `turbo`
+- [x] Configure task dependencies (`build` depends on `^build` and `typecheck`)
+- [x] Verify `turbo run build` succeeds
+- **Status:** complete
+
+### Phase 9: Verification & Handoff
+- [x] Run `turbo run typecheck` and `turbo run build`
+- [x] Update progress.md and findings.md
+- [x] Deliver final summary to user
+- **Status:** complete
+
 ## Key Questions — Answered
 1. **What is Ordpaw?** Full-stack AI Agent development/debugging platform.
-2. **Architecture?** pnpm monorepo: Vite vanilla TS SPA client + Express/WebSocket server + sql.js SQLite.
-3. **Critical concerns?** No auth, hardcoded crypto fallback, weak script sandbox, full-history LLM calls, unbounded endpoints.
-4. **Obvious bugs?** Server/client TypeScript build errors, undefined `pluginRegistry`, missing `SkillRunner.registerSkill`, export filename regression.
-5. **Build/test status?** Client builds; server fails to build; no tests exist.
+2. **Architecture?** pnpm + Turborepo monorepo: Vite vanilla TS SPA client + Express/WebSocket server + sql.js SQLite.
+3. **Critical concerns?** Auth still missing; crypto/CORS/SQL injection vectors hardened; weak script sandbox remains a known limitation.
+4. **Obvious bugs?** All identified build/runtime bugs fixed; export filename regression fixed.
+5. **Build/test status?** `turbo run typecheck` and `turbo run build` pass; no tests exist yet.
 
 ## Decisions Made
 | Decision | Rationale |
 |----------|-----------|
 | Use planning-with-files to track multi-phase analysis | Complex task spanning many files and tool calls |
 | Use file-search, code-optimizer, systematic-debugging, webapp-testing skills | User explicitly requested |
-| Defer browser automation | Build/type errors make UI testing premature |
+| Add `packageManager` and Turborepo | Required by turbo 2.x; enables caching and task orchestration |
+| Keep script sandbox (`node:vm`) unchanged | Full isolation would require worker process refactor; out of scope for this round |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
 |-------|---------|------------|
-| Server build fails (8 TS errors) | 1 | Documented in findings.md with fix plan |
-| Client build fails (3 TS errors) | 1 | Documented in findings.md with fix plan |
-| No tests in repository | 1 | Documented as quality gap |
+| Server build fails (8 TS errors) | 1 | Added sql.js types, typed callbacks, implemented registerSkill |
+| Client build fails (3 TS errors) | 1 | Implemented PluginRegistry, fixed ChatView assignment |
+| Turbo missing `packageManager` | 1 | Added `packageManager`: `pnpm@10.28.1` |
+| Turbo 2.x `pipeline` → `tasks` | 1 | Renamed key in turbo.json |
 
 ## Notes
 - Update phase status as you progress: pending → in_progress → complete

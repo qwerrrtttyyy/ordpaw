@@ -3,7 +3,7 @@ import type { TestSuite, TestCase, TestRun, TestRunResult, CreateTestSuiteReques
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { agentRuntime } from './agent-runtime.js';
 import { sessionManager } from './session.js';
-import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { queryAll, queryOne, safeJsonParse, buildUpdateSet } from '../db/utils.js';
 
 export class TestSuiteManager {
   listSuites(agentId?: string): TestSuite[] {
@@ -57,23 +57,17 @@ export class TestSuiteManager {
     if (!suite) return null;
 
     const db = getDatabase();
-    const updates: string[] = [];
-    const params: any[] = [];
+    const updates: Record<string, any> = {};
+    if (data.name !== undefined) updates.name = data.name.toString();
+    if (data.description !== undefined) updates.description = data.description.toString();
 
-    if (data.name !== undefined) {
-      updates.push('name = ?');
-      params.push(data.name.toString());
-    }
-    if (data.description !== undefined) {
-      updates.push('description = ?');
-      params.push(data.description.toString());
-    }
+    const set = buildUpdateSet(updates, {
+      name: 'name',
+      description: 'description',
+    }, { updated_at: Date.now() });
 
-    if (updates.length > 0) {
-      updates.push('updated_at = ?');
-      params.push(Date.now());
-      params.push(id);
-      db.run(`UPDATE test_suites SET ${updates.join(', ')} WHERE id = ?`, params);
+    if (set) {
+      db.run(`UPDATE test_suites SET ${set.sql} WHERE id = ?`, [...set.params, id]);
       saveDatabase();
     }
 
@@ -107,35 +101,23 @@ export class TestSuiteManager {
     if (!existing) return null;
 
     const db = getDatabase();
-    const updates: string[] = [];
-    const params: any[] = [];
+    const updates: Record<string, any> = {};
+    if (data.name !== undefined) updates.name = data.name.toString();
+    if (data.input !== undefined) updates.input = data.input.toString();
+    if (data.expectedOutput !== undefined) updates.expectedOutput = data.expectedOutput.toString();
+    if (data.expectedContains !== undefined) updates.expectedContains = JSON.stringify(this.normalizeExpectedContains(data.expectedContains));
+    if (data.variables !== undefined) updates.variables = JSON.stringify(data.variables);
 
-    if (data.name !== undefined) {
-      updates.push('name = ?');
-      params.push(data.name.toString());
-    }
-    if (data.input !== undefined) {
-      updates.push('input = ?');
-      params.push(data.input.toString());
-    }
-    if (data.expectedOutput !== undefined) {
-      updates.push('expected_output = ?');
-      params.push(data.expectedOutput.toString());
-    }
-    if (data.expectedContains !== undefined) {
-      updates.push('expected_contains_json = ?');
-      params.push(JSON.stringify(this.normalizeExpectedContains(data.expectedContains)));
-    }
-    if (data.variables !== undefined) {
-      updates.push('variables_json = ?');
-      params.push(JSON.stringify(data.variables));
-    }
+    const set = buildUpdateSet(updates, {
+      name: 'name',
+      input: 'input',
+      expectedOutput: 'expected_output',
+      expectedContains: 'expected_contains_json',
+      variables: 'variables_json',
+    }, { updated_at: Date.now() });
 
-    if (updates.length > 0) {
-      updates.push('updated_at = ?');
-      params.push(Date.now());
-      params.push(caseId);
-      db.run(`UPDATE test_cases SET ${updates.join(', ')} WHERE id = ?`, params);
+    if (set) {
+      db.run(`UPDATE test_cases SET ${set.sql} WHERE id = ?`, [...set.params, caseId]);
       saveDatabase();
     }
 

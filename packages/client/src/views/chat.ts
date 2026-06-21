@@ -10,7 +10,7 @@ export class ChatView {
   private inputEl: HTMLTextAreaElement | null = null;
   private sendBtn: HTMLElement | null = null;
   private statusEl: HTMLElement | null = null;
-  private conversation: Conversation;
+  private conversation!: Conversation;
   private api: API;
   private conversationId: string;
   private streaming = false;

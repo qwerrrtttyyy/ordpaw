@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Provider, ModelInfo, CreateProviderRequest } from '@ordpaw/shared';
 import { getDatabase, saveDatabase } from '../db/index.js';
-import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
+import { queryAll, queryOne, safeJsonParse, buildUpdateSet } from '../db/utils.js';
 import { obfuscateApiKey, deobfuscateApiKey } from './api-key-crypto.js';
 
 const BUILT_IN_PROVIDERS: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>[] = [
@@ -117,44 +117,27 @@ export class ProviderService {
     if (!provider) return null;
 
     const db = getDatabase();
-    const updates: string[] = [];
-    const params: any[] = [];
+    const updates: Record<string, any> = {};
+    if (data.name !== undefined) updates.name = data.name.toString();
+    if (data.baseUrl !== undefined) updates.baseUrl = data.baseUrl.toString();
+    if (data.apiKey !== undefined) updates.apiKey = obfuscateApiKey((data.apiKey || '').toString());
+    if (data.apiKeyName !== undefined) updates.apiKeyName = data.apiKeyName.toString();
+    if (data.models !== undefined) updates.models = JSON.stringify(data.models);
+    if (data.enabled !== undefined) updates.enabled = data.enabled ? 1 : 0;
+    if (data.config !== undefined) updates.config = JSON.stringify(data.config);
 
-    if (data.name !== undefined) {
-      updates.push('name = ?');
-      params.push(data.name.toString());
-    }
-    if (data.baseUrl !== undefined) {
-      updates.push('base_url = ?');
-      params.push(data.baseUrl.toString());
-    }
-    if (data.apiKey !== undefined) {
-      updates.push('api_key = ?');
-      // Obfuscate before storing.
-      params.push(obfuscateApiKey((data.apiKey || '').toString()));
-    }
-    if (data.apiKeyName !== undefined) {
-      updates.push('api_key_name = ?');
-      params.push(data.apiKeyName.toString());
-    }
-    if (data.models !== undefined) {
-      updates.push('models_json = ?');
-      params.push(JSON.stringify(data.models));
-    }
-    if (data.enabled !== undefined) {
-      updates.push('enabled = ?');
-      params.push(data.enabled ? 1 : 0);
-    }
-    if (data.config !== undefined) {
-      updates.push('config_json = ?');
-      params.push(JSON.stringify(data.config));
-    }
+    const set = buildUpdateSet(updates, {
+      name: 'name',
+      baseUrl: 'base_url',
+      apiKey: 'api_key',
+      apiKeyName: 'api_key_name',
+      models: 'models_json',
+      enabled: 'enabled',
+      config: 'config_json',
+    }, { updated_at: Date.now() });
 
-    if (updates.length > 0) {
-      updates.push('updated_at = ?');
-      params.push(Date.now());
-      params.push(id);
-      db.run(`UPDATE providers SET ${updates.join(', ')} WHERE id = ?`, params);
+    if (set) {
+      db.run(`UPDATE providers SET ${set.sql} WHERE id = ?`, [...set.params, id]);
       saveDatabase();
     }
 

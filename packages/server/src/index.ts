@@ -26,6 +26,24 @@ const __dirname = dirname(__filename);
 
 let server: any = null;
 
+function configureCors() {
+  const raw = process.env.ORDPAW_CORS_ORIGIN;
+  if (!raw) {
+    // 默认：前端静态资源同源，API 无需跨域
+    return cors({ origin: false });
+  }
+  const allowed = raw.split(',').map(s => s.trim()).filter(Boolean);
+  return cors({
+    origin: (origin, callback) => {
+      // 允许无 Origin 的请求（如 curl、移动端 WebView）
+      if (!origin) return callback(null, true);
+      if (allowed.includes(origin)) return callback(null, true);
+      callback(new Error(`CORS 策略拒绝来源: ${origin}`));
+    },
+    credentials: true,
+  });
+}
+
 async function start() {
   try {
     // 初始化数据库
@@ -42,7 +60,7 @@ async function start() {
     const wss = new WebSocketServer({ server: httpServer });
 
     // 基础中间件
-    app.use(cors());
+    app.use(configureCors());
     app.use(express.json({ limit: '10mb' }));
     app.use(requestLogger);
 

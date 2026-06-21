@@ -16,7 +16,12 @@
 const PREFIX = 'enc:v1:';
 
 function getKey(): Buffer {
-  const secret = process.env.ORDPAW_DB_SECRET || 'ordpaw-default-db-secret-v0.0.1';
+  const secret = process.env.ORDPAW_DB_SECRET;
+  if (!secret) {
+    throw new Error(
+      '缺少环境变量 ORDPAW_DB_SECRET。请设置一个强随机密钥（例如：openssl rand -hex 32）后再启动服务。'
+    );
+  }
   // Stretch to 32 bytes by repeating + hashing
   const buf = Buffer.alloc(32);
   const src = Buffer.from(secret, 'utf-8');

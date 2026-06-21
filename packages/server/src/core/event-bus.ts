@@ -11,8 +11,11 @@ class EventBusImpl {
   }
 
   off(event: string, callback: EventCallback): void {
-    if (this.listeners.has(event)) {
-      this.listeners.get(event)!.delete(callback);
+    const set = this.listeners.get(event);
+    if (!set) return;
+    set.delete(callback);
+    if (set.size === 0) {
+      this.listeners.delete(event);
     }
   }
 
