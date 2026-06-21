@@ -201,6 +201,15 @@ export async function initDatabase(): Promise<Database> {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS plugin_storage (
+      plugin_name TEXT NOT NULL,
+      key TEXT NOT NULL,
+      value_json TEXT NOT NULL,
+      updated_at INTEGER NOT NULL,
+      PRIMARY KEY (plugin_name, key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_plugin_storage_plugin ON plugin_storage(plugin_name);
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_checkpoints_conv ON checkpoints(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_agent ON conversations(agent_id);

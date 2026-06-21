@@ -29,6 +29,21 @@
 - [x] 修复 Task：后端组件服务器 REST 路由 `/api/components/*` 未正确挂载
   - [x] 问题：`api/index.ts` 原来仅直接注册了 `/api/components/manifest`，而 `index.ts` 将 `componentServer.getRouter()` 挂在 `/components`，导致 `/api/components/tree|relationships|plugins|register` 等端点不可用，且 `/api/components/manifest` 的响应格式与前端期望的 `{ version, items }` 不一致。
   - [x] 修复：将 `api/index.ts` 中的 `/components/manifest` 直接路由替换为 `router.use('/components', componentServer.getRouter())`，使所有 `/api/components/*` 端点生效并返回正确格式。
+- [x] Task 8: 补全插件加载器未实现功能
+  - [x] 实现 `getSession`：委托给 `sessionManager.getConversation`
+  - [x] 实现插件私有存储 `db`：新增 `plugin_storage` 表，提供 get/set/delete/list/clear
+  - [x] 重构 `loader.ts` 提取 `createPluginApi` 以便测试
+  - [x] 新增 `plugin-loader.test.ts`（10 个测试）
+- [x] Task 9: 补全 MCP 客户端真实 transport 连接
+  - [x] 添加 `@modelcontextprotocol/sdk` 与 `zod` 依赖
+  - [x] 为 stdio/sse/websocket 创建真实 transport
+  - [x] `connectServer` 使用 SDK `Client.connect`
+  - [x] `callTool` 通过真实连接调用工具
+  - [x] 新增 `mcp-client.test.ts`（9 个测试）
+- [x] Task 10: 最终验证
+  - [x] 运行 `pnpm build` 通过
+  - [x] 运行 `pnpm -r exec -- tsc --noEmit` 通过
+  - [x] 运行 `pnpm test` 66/66 通过
 
 # Task Dependencies
 无关键依赖，Task 1-5 可并行，Task 6/7 在所有实现完成后执行。

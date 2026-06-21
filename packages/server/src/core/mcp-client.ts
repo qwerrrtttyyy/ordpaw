@@ -1,9 +1,20 @@
 import type { McpServer, McpConfig, InstallMcpRequest } from '@ordpaw/shared';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase, saveDatabase } from '../db/index.js';
+import { Client } from '@modelcontextprotocol/sdk/client';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio';
+import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse';
+import { WebSocketClientTransport } from '@modelcontextprotocol/sdk/client/websocket';
+
+interface ActiveConnection {
+  config: McpConfig;
+  connected: boolean;
+  client?: Client;
+  transport?: StdioClientTransport | SSEClientTransport | WebSocketClientTransport;
+}
 
 class McpClient {
-  private connections: Map<string, { config: McpConfig; connected: boolean }> = new Map();
+  private connections: Map<string, ActiveConnection> = new Map();
 
   init(): void {
     try {
@@ -21,7 +32,7 @@ class McpClient {
           url: row[idx('url')] as string | undefined,
           env: this.safeJsonParse(row[idx('env_json')], {}),
           enabled: row[idx('enabled')] === 1,
-          connected: false, // Start disconnected
+          connected: false, // 初始化为未连接，避免进程未启动时误判
           createdAt: row[idx('created_at')] as number,
           updatedAt: row[idx('updated_at')] as number,
         };
@@ -72,11 +83,11 @@ class McpClient {
       connected: false,
     });
 
-    // Best-effort auto-connect
+    // 安装后尝试自动连接，失败不影响安装结果
     try {
       await this.connectServer(id);
     } catch {
-      // Non-fatal
+      // 非致命错误
     }
 
     return server;
@@ -89,8 +100,21 @@ class McpClient {
     const conn = this.connections.get(server.name);
     if (!conn) throw new Error(`MCP 连接不存在: ${server.name}`);
 
-    // TODO: Implement real MCP transport connection
-    console.log(`MCP 连接 ${server.name} (${server.transport})`);
+    // 关闭已有连接，避免重复
+    if (conn.client) {
+      try { await conn.client.close(); } catch { /* ignore */ }
+    }
+
+    const transport = this.createTransport(conn.config);
+    const client = new Client(
+      { name: 'ordpaw-mcp-client', version: '0.0.3' },
+      { capabilities: {} }
+    );
+
+    await client.connect(transport);
+
+    conn.client = client;
+    conn.transport = transport;
     conn.connected = true;
 
     const db = getDatabase();
@@ -105,6 +129,11 @@ class McpClient {
     if (!server) throw new Error(`MCP 服务不存在: ${id}`);
 
     const conn = this.connections.get(server.name);
+    if (conn?.client) {
+      try { await conn.client.close(); } catch { /* ignore */ }
+      conn.client = undefined;
+      conn.transport = undefined;
+    }
     if (conn) conn.connected = false;
 
     const db = getDatabase();
@@ -118,7 +147,12 @@ class McpClient {
     const server = this.getServer(id);
     if (!server) return false;
 
+    const conn = this.connections.get(server.name);
+    if (conn?.client) {
+      conn.client.close().catch(() => {});
+    }
     this.connections.delete(server.name);
+
     const db = getDatabase();
     db.run('DELETE FROM mcp_servers WHERE id = ?', [id]);
     saveDatabase();
@@ -169,7 +203,7 @@ class McpClient {
     };
   }
 
-  // Legacy API kept for backward compatibility
+  // 保留旧版 API 以兼容已有代码
   async connect(config: McpConfig): Promise<void> {
     this.connections.set(config.name, { config, connected: true });
   }
@@ -188,11 +222,35 @@ class McpClient {
 
   async callTool(name: string, toolName: string, params: any): Promise<any> {
     const conn = this.connections.get(name);
-    if (!conn || !conn.connected) {
+    if (!conn || !conn.connected || !conn.client) {
       throw new Error(`MCP connection not found: ${name}`);
     }
-    console.log(`MCP 调用工具 ${toolName} on ${name}`, params);
-    return { result: `Tool ${toolName} executed` };
+    const raw = await conn.client.callTool({ name: toolName, arguments: params });
+    if ('content' in raw) {
+      return { result: raw.content };
+    }
+    return { result: raw.toolResult };
+  }
+
+  private createTransport(config: McpConfig): StdioClientTransport | SSEClientTransport | WebSocketClientTransport {
+    switch (config.transport) {
+      case 'stdio': {
+        if (!config.command) throw new Error('stdio transport 需要提供 command');
+        const parts = config.command.trim().split(/\s+/).filter(Boolean);
+        const command = parts.shift()!;
+        return new StdioClientTransport({ command, args: parts, env: config.env });
+      }
+      case 'sse': {
+        if (!config.url) throw new Error('sse transport 需要提供 url');
+        return new SSEClientTransport(new URL(config.url));
+      }
+      case 'websocket': {
+        if (!config.url) throw new Error('websocket transport 需要提供 url');
+        return new WebSocketClientTransport(new URL(config.url));
+      }
+      default:
+        throw new Error(`不支持的 transport: ${(config as any).transport}`);
+    }
   }
 
   private safeJsonParse(val: any, def: any): any {

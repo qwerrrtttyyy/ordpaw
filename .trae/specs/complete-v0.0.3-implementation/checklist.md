@@ -8,4 +8,9 @@
 - [x] 所有子包 `package.json` 版本为 `0.0.3`
 - [x] `app.ts` 中 `window.__ordpaw.version` 为 `0.0.3`
 - [x] TypeScript 类型检查 0 错误
-- [x] 测试套件 47/47 通过
+- [x] 测试套件 66/66 通过
+- [x] 插件 `createPluginApi` 已提取并可测试
+- [x] 插件 `getSession` 已实现
+- [x] 插件私有存储 `db` 已实现
+- [x] MCP 客户端真实 transport 连接已实现
+- [x] 后端 `/api/components/*` 路由已完整挂载
