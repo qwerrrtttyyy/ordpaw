@@ -13,22 +13,28 @@ global.window = {
   matchMedia: vi.fn(() => ({ matches: false, addEventListener: vi.fn() }))
 } as any;
 
+function makeResponse<T>(data: T, ok = true, status = 200): any {
+  return {
+    ok,
+    status,
+    statusText: ok ? 'OK' : 'Error',
+    headers: { get: (h: string) => h === 'content-type' ? 'application/json' : '' },
+    json: async () => data,
+    text: async () => JSON.stringify(data)
+  };
+}
+
 describe('API Cache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should cache API responses with TTL', async () => {
-    const { API } = await import('./api');
+    const { API } = await import('../api');
     const api = new API();
 
     const mockData = [{ id: '1', name: 'test' }];
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => JSON.stringify(mockData)
-    });
+    (global.fetch as any).mockResolvedValue(makeResponse(mockData));
 
     const result1 = await api.getAgents();
     const result2 = await api.getAgents();
@@ -40,25 +46,20 @@ describe('API Cache', () => {
   });
 
   it('should invalidate cache after mutations', async () => {
-    const { API } = await import('./api');
+    const { API } = await import('../api');
     const api = new API();
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => '[]'
-    });
+    (global.fetch as any).mockResolvedValue(makeResponse([]));
 
     await api.getAgents();
-    await api.invalidateCache('agents');
+    api.invalidateCache('agents');
     await api.getAgents();
 
     expect(global.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('should deduplicate concurrent requests', async () => {
-    const { API } = await import('./api');
+    const { API } = await import('../api');
     const api = new API();
 
     let resolveFn: (value: any) => void;
@@ -69,12 +70,7 @@ describe('API Cache', () => {
     const p1 = api.getAgents();
     const p2 = api.getAgents();
 
-    resolveFn!({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => '[]'
-    });
+    resolveFn!(makeResponse([]));
 
     await Promise.all([p1, p2]);
 
@@ -83,15 +79,10 @@ describe('API Cache', () => {
   });
 
   it('should clear entire cache', async () => {
-    const { API } = await import('./api');
+    const { API } = await import('../api');
     const api = new API();
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      status: 200,
-      headers: { get: () => 'application/json' },
-      text: async () => '[]'
-    });
+    (global.fetch as any).mockResolvedValue(makeResponse([]));
 
     await api.getAgents();
     await api.getPrompts();
@@ -109,37 +100,44 @@ describe('Error Handling', () => {
   });
 
   it('should throw typed errors on 4xx', async () => {
-    const { API } = await import('./api');
+    const { API } = await import('../api');
     const api = new API();
 
-    (global.fetch as any).mockResolvedValue({
-      ok: false,
-      status: 404,
-      statusText: 'Not Found',
-      headers: { get: () => 'application/json' },
-      json: async () => ({ error: 'Resource not found' })
-    });
+    (global.fetch as any).mockResolvedValue(
+      makeResponse({ error: 'Resource not found' }, false, 404)
+    );
 
-    await expect(api.getAgent('invalid')).rejects.toThrow('[API 404]');
+    await expect(api.getAgent('invalid')).rejects.toThrow('Resource not found');
   });
 
   it('should include error details', async () => {
-    const { API } = await import('./api');
+    const { API } = await import('../api');
     const api = new API();
 
-    (global.fetch as any).mockResolvedValue({
-      ok: false,
-      status: 400,
-      statusText: 'Bad Request',
-      headers: { get: () => 'application/json' },
-      json: async () => ({ error: 'Validation failed', details: { field: 'name' } })
-    });
+    (global.fetch as any).mockResolvedValue(
+      makeResponse({ error: 'Validation failed', details: { field: 'name' } }, false, 400)
+    );
 
     try {
       await api.createAgent({});
     } catch (e: any) {
       expect(e.status).toBe(400);
       expect(e.details).toEqual({ field: 'name' });
+    }
+  });
+
+  it('should have a code property for error classification', async () => {
+    const { API } = await import('../api');
+    const api = new API();
+
+    (global.fetch as any).mockResolvedValue(
+      makeResponse({ error: 'Not found' }, false, 404)
+    );
+
+    try {
+      await api.getAgent('invalid');
+    } catch (e: any) {
+      expect(e.code).toBe('not_found');
     }
   });
 });

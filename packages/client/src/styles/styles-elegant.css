@@ -1,436 +1,836 @@
-/* Elegant UI Enhancements */
+/* ==========================================================================
+   Elegant UI Enhancements — v0.0.3
+   精致典雅的用户界面样式系统
+   ========================================================================== */
 
-/* Refined Color Palette */
 :root {
-  /* Sophisticated neutrals */
+  /* === Sophisticated Color Palette === */
   --elegant-bg-primary: #fafbfc;
   --elegant-bg-secondary: #f5f6f8;
   --elegant-bg-tertiary: #ebedf0;
+  --elegant-bg-elevated: #ffffff;
+
   --elegant-text-primary: #1a1d23;
   --elegant-text-secondary: #5f6368;
   --elegant-text-tertiary: #9aa0a6;
+  --elegant-text-inverse: #ffffff;
 
-  /* Accent colors with depth */
+  /* === Accent Colors — Refined & Coordinated === */
   --elegant-accent-primary: #4a90e2;
   --elegant-accent-secondary: #7c3aed;
   --elegant-accent-success: #10b981;
   --elegant-accent-warning: #f59e0b;
   --elegant-accent-danger: #ef4444;
+  --elegant-accent-info: #0ea5e9;
 
-  /* Gradients */
+  /* === Sophisticated Gradients === */
   --elegant-gradient-primary: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --elegant-gradient-secondary: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --elegant-gradient-accent: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  --elegant-gradient-subtle: linear-gradient(180deg, #fafbfc 0%, #f0f2f5 100%);
+  --elegant-gradient-warm: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  --elegant-gradient-cool: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
 
-  /* Shadows with depth */
+  /* === Elevated Shadows (Layered) === */
+  --elegant-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
   --elegant-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
   --elegant-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --elegant-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
   --elegant-shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.16);
+  --elegant-shadow-glow-primary: 0 0 24px rgba(74, 144, 226, 0.25);
+  --elegant-shadow-glow-success: 0 0 24px rgba(16, 185, 129, 0.25);
+  --elegant-shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 
-  /* Transitions */
+  /* === Typography Scale === */
+  --elegant-font-tiny: 11px;
+  --elegant-font-small: 13px;
+  --elegant-font-base: 14px;
+  --elegant-font-medium: 16px;
+  --elegant-font-large: 18px;
+  --elegant-font-heading: 24px;
+  --elegant-font-title: 32px;
+  --elegant-font-display: 48px;
+
+  /* === Spacing Scale === */
+  --elegant-space-1: 4px;
+  --elegant-space-2: 8px;
+  --elegant-space-3: 12px;
+  --elegant-space-4: 16px;
+  --elegant-space-5: 20px;
+  --elegant-space-6: 24px;
+  --elegant-space-8: 32px;
+  --elegant-space-10: 40px;
+  --elegant-space-12: 48px;
+
+  /* === Radius Scale === */
+  --elegant-radius-xs: 4px;
+  --elegant-radius-sm: 8px;
+  --elegant-radius-md: 12px;
+  --elegant-radius-lg: 16px;
+  --elegant-radius-xl: 24px;
+  --elegant-radius-full: 9999px;
+
+  /* === Transitions — Carefully Tuned Curves === */
   --elegant-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   --elegant-transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --elegant-transition-slow: 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  --elegant-transition-smooth: 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  --elegant-transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* === Border & Opacity === */
+  --elegant-border-thin: 1px solid rgba(0, 0, 0, 0.04);
+  --elegant-border-normal: 1px solid rgba(0, 0, 0, 0.08);
+  --elegant-border-muted: 1px solid rgba(0, 0, 0, 0.03);
+
+  --elegant-opacity-hover: 0.92;
+  --elegant-opacity-disabled: 0.45;
 }
 
-/* Elegant Card Design */
+/* ==========================================================================
+   Dark Mode Adaptation
+   ========================================================================== */
+[data-theme="dark"] {
+  --elegant-bg-primary: #0f1115;
+  --elegant-bg-secondary: #151820;
+  --elegant-bg-tertiary: #1c2029;
+  --elegant-bg-elevated: #1a1d23;
+
+  --elegant-text-primary: #e4e7ec;
+  --elegant-text-secondary: #9aa0a6;
+  --elegant-text-tertiary: #6b7280;
+
+  --elegant-border-thin: 1px solid rgba(255, 255, 255, 0.04);
+  --elegant-border-normal: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ==========================================================================
+   Typography — Editorial
+   ========================================================================== */
+.elegant-typography-display {
+  font-size: var(--elegant-font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: var(--elegant-text-primary);
+}
+
+.elegant-typography-title {
+  font-size: var(--elegant-font-title);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  color: var(--elegant-text-primary);
+}
+
+.elegant-typography-heading {
+  font-size: var(--elegant-font-heading);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  color: var(--elegant-text-primary);
+}
+
+.elegant-typography-caption {
+  font-size: var(--elegant-font-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+  color: var(--elegant-text-tertiary);
+}
+
+.elegant-typography-serif {
+  font-family: 'Georgia', 'Cambria', 'Times New Roman', serif;
+  font-style: italic;
+}
+
+/* ==========================================================================
+   Elegant Card Design — with subtle glow on hover
+   ========================================================================== */
 .elegant-card {
-  background: white;
-  border-radius: 16px;
+  background: var(--elegant-bg-elevated);
+  border-radius: var(--elegant-radius-lg);
   box-shadow: var(--elegant-shadow-md);
   transition: all var(--elegant-transition-normal);
-  border: 1px solid rgba(0, 0, 0, 0.04);
+  border: var(--elegant-border-thin);
   overflow: hidden;
+  position: relative;
+}
+
+.elegant-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    transparent 100%);
+  opacity: 0;
+  transition: opacity var(--elegant-transition-normal);
+  pointer-events: none;
 }
 
 .elegant-card:hover {
   box-shadow: var(--elegant-shadow-lg);
   transform: translateY(-2px);
+  border-color: rgba(0, 0, 0, 0.08);
 }
 
-.elegant-card-header {
-  padding: 24px 24px 16px;
-  border-bottom: 1px solid var(--elegant-bg-tertiary);
-  background: var(--elegant-bg-primary);
-}
+.elegant-card:hover::before { opacity: 1; }
 
-.elegant-card-title {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--elegant-text-primary);
-  margin: 0 0 4px 0;
-  letter-spacing: -0.01em;
-}
-
-.elegant-card-subtitle {
-  font-size: 14px;
-  color: var(--elegant-text-secondary);
-  margin: 0;
-  line-height: 1.5;
-}
-
-.elegant-card-body {
-  padding: 24px;
-}
-
-/* Refined Buttons */
-.elegant-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  font-size: 14px;
-  font-weight: 500;
-  border-radius: 10px;
-  border: none;
+.elegant-card-clickable {
   cursor: pointer;
-  transition: all var(--elegant-transition-fast);
-  text-decoration: none;
-  line-height: 1.5;
+  user-select: none;
 }
 
-.elegant-btn-primary {
-  background: var(--elegant-gradient-primary);
-  color: white;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
-
-.elegant-btn-primary:hover {
-  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-  transform: translateY(-1px);
-}
-
-.elegant-btn-secondary {
-  background: white;
-  color: var(--elegant-text-primary);
-  border: 1px solid var(--elegant-bg-tertiary);
+.elegant-card-clickable:active {
+  transform: translateY(0) scale(0.998);
   box-shadow: var(--elegant-shadow-sm);
 }
 
-.elegant-btn-secondary:hover {
-  background: var(--elegant-bg-primary);
-  border-color: var(--elegant-accent-primary);
-  color: var(--elegant-accent-primary);
+/* === Card Variants === */
+.elegant-card-glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.elegant-btn-ghost {
+.elegant-card-featured {
+  background: var(--elegant-gradient-primary);
+  color: var(--elegant-text-inverse);
+  border: none;
+}
+
+.elegant-card-featured .elegant-card-title { color: var(--elegant-text-inverse); }
+
+/* ==========================================================================
+   Elegant Buttons — with layered visual feedback
+   ========================================================================== */
+.elegant-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--elegant-space-2);
+  padding: var(--elegant-space-3) var(--elegant-space-5);
+  font-size: var(--elegant-font-base);
+  font-weight: 500;
+  line-height: 1;
+  border-radius: var(--elegant-radius-md);
+  border: var(--elegant-border-normal);
+  background: var(--elegant-bg-elevated);
+  color: var(--elegant-text-primary);
+  cursor: pointer;
+  user-select: none;
+  transition: all var(--elegant-transition-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.elegant-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--elegant-shadow-sm);
+  border-color: rgba(0, 0, 0, 0.12);
+}
+
+.elegant-button:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--elegant-shadow-xs);
+}
+
+.elegant-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3), var(--elegant-shadow-sm);
+}
+
+.elegant-button:disabled {
+  opacity: var(--elegant-opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* === Button Variants === */
+.elegant-button-primary {
+  background: var(--elegant-accent-primary);
+  color: var(--elegant-text-inverse);
+  border-color: transparent;
+  box-shadow: 0 1px 2px rgba(74, 144, 226, 0.2);
+}
+
+.elegant-button-primary:hover:not(:disabled) {
+  background: #3a7bc8;
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.35);
+}
+
+.elegant-button-gradient {
+  background: var(--elegant-gradient-primary);
+  color: var(--elegant-text-inverse);
+  border-color: transparent;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.elegant-button-gradient:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.45);
+}
+
+.elegant-button-ghost {
   background: transparent;
+  border-color: transparent;
   color: var(--elegant-text-secondary);
 }
 
-.elegant-btn-ghost:hover {
-  background: var(--elegant-bg-secondary);
+.elegant-button-ghost:hover:not(:disabled) {
+  background: var(--elegant-bg-tertiary);
   color: var(--elegant-text-primary);
+  box-shadow: none;
 }
 
-/* Elegant Input Fields */
+.elegant-button-success {
+  background: var(--elegant-accent-success);
+  color: var(--elegant-text-inverse);
+  border-color: transparent;
+}
+
+.elegant-button-danger {
+  background: var(--elegant-accent-danger);
+  color: var(--elegant-text-inverse);
+  border-color: transparent;
+}
+
+/* === Button Sizes === */
+.elegant-button-sm {
+  padding: var(--elegant-space-2) var(--elegant-space-4);
+  font-size: var(--elegant-font-small);
+  border-radius: var(--elegant-radius-sm);
+}
+
+.elegant-button-lg {
+  padding: var(--elegant-space-4) var(--elegant-space-6);
+  font-size: var(--elegant-font-medium);
+  border-radius: var(--elegant-radius-md);
+}
+
+/* ==========================================================================
+   Elegant Inputs — floating label style
+   ========================================================================== */
+.elegant-input-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--elegant-space-2);
+}
+
+.elegant-input-label {
+  font-size: var(--elegant-font-small);
+  font-weight: 500;
+  color: var(--elegant-text-secondary);
+}
+
 .elegant-input {
   width: 100%;
-  padding: 12px 16px;
-  font-size: 14px;
-  border: 1px solid var(--elegant-bg-tertiary);
-  border-radius: 10px;
-  background: white;
+  padding: var(--elegant-space-3) var(--elegant-space-4);
+  font-size: var(--elegant-font-base);
+  line-height: 1.5;
+  border-radius: var(--elegant-radius-md);
+  border: var(--elegant-border-normal);
+  background: var(--elegant-bg-elevated);
   color: var(--elegant-text-primary);
   transition: all var(--elegant-transition-fast);
+  font-family: inherit;
+}
+
+.elegant-input:hover:not(:disabled) {
+  border-color: rgba(0, 0, 0, 0.12);
 }
 
 .elegant-input:focus {
   outline: none;
   border-color: var(--elegant-accent-primary);
-  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.1);
+  box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.12);
 }
 
-.elegant-input::placeholder {
-  color: var(--elegant-text-tertiary);
+.elegant-input:disabled {
+  opacity: var(--elegant-opacity-disabled);
+  cursor: not-allowed;
+  background: var(--elegant-bg-secondary);
 }
 
-/* Elegant Labels */
-.elegant-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--elegant-text-secondary);
-  margin-bottom: 6px;
-  letter-spacing: 0.01em;
+.elegant-textarea {
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
 }
 
-/* Elegant Badges */
-.elegant-badge {
+/* ==========================================================================
+   Elegant Tags / Badges
+   ========================================================================== */
+.elegant-tag {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--elegant-font-tiny);
   font-weight: 500;
-  border-radius: 6px;
-  line-height: 1;
+  line-height: 1.4;
+  border-radius: var(--elegant-radius-full);
+  background: var(--elegant-bg-tertiary);
+  color: var(--elegant-text-secondary);
+  transition: all var(--elegant-transition-fast);
 }
 
-.elegant-badge-primary {
-  background: rgba(74, 144, 226, 0.1);
+.elegant-tag-primary {
+  background: rgba(74, 144, 226, 0.12);
   color: var(--elegant-accent-primary);
 }
 
-.elegant-badge-success {
-  background: rgba(16, 185, 129, 0.1);
+.elegant-tag-success {
+  background: rgba(16, 185, 129, 0.12);
   color: var(--elegant-accent-success);
 }
 
-.elegant-badge-warning {
-  background: rgba(245, 158, 11, 0.1);
+.elegant-tag-warning {
+  background: rgba(245, 158, 11, 0.12);
   color: var(--elegant-accent-warning);
 }
 
-.elegant-badge-danger {
-  background: rgba(239, 68, 68, 0.1);
+.elegant-tag-danger {
+  background: rgba(239, 68, 68, 0.12);
   color: var(--elegant-accent-danger);
 }
 
-/* Elegant Lists */
+.elegant-tag-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.8;
+}
+
+/* ==========================================================================
+   Elegant Separators
+   ========================================================================== */
+.elegant-divider {
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 10%,
+    rgba(0, 0, 0, 0.08) 90%,
+    transparent 100%);
+  border: none;
+  margin: var(--elegant-space-6) 0;
+}
+
+/* ==========================================================================
+   Elegant Status / Status indicators — with subtle pulse
+   ========================================================================== */
+.elegant-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--elegant-font-small);
+  color: var(--elegant-text-secondary);
+}
+
+.elegant-status-pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.elegant-status-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  animation: elegant-pulse 2s ease-in-out infinite;
+}
+
+.elegant-status-active .elegant-status-pulse {
+  background: var(--elegant-accent-success);
+}
+.elegant-status-active .elegant-status-pulse::after {
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+}
+
+.elegant-status-warning .elegant-status-pulse {
+  background: var(--elegant-accent-warning);
+}
+.elegant-status-warning .elegant-status-pulse::after {
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5);
+}
+
+@keyframes elegant-pulse {
+  0% { transform: scale(1); opacity: 0.6; }
+  70% { transform: scale(2.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 0; }
+}
+
+/* ==========================================================================
+   Elegant Sections — with background accents
+   ========================================================================== */
+.elegant-section {
+  padding: var(--elegant-space-10) var(--elegant-space-6);
+  position: relative;
+  overflow: hidden;
+}
+
+.elegant-section-hero {
+  background:
+    radial-gradient(ellipse 80% 50% at 50% 0%,
+      rgba(74, 144, 226, 0.08) 0%,
+      transparent 60%),
+    var(--elegant-bg-primary);
+  padding-top: var(--elegant-space-12);
+}
+
+.elegant-section-header {
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto var(--elegant-space-8);
+}
+
+.elegant-section-title {
+  font-size: var(--elegant-font-heading);
+  font-weight: 700;
+  color: var(--elegant-text-primary);
+  margin-bottom: var(--elegant-space-3);
+  letter-spacing: -0.01em;
+}
+
+.elegant-section-subtitle {
+  font-size: var(--elegant-font-medium);
+  color: var(--elegant-text-secondary);
+  line-height: 1.6;
+}
+
+/* ==========================================================================
+   Elegant Component Server Visualization
+   ========================================================================== */
+.elegant-component-node {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--elegant-space-4) var(--elegant-space-5);
+  background: var(--elegant-bg-elevated);
+  border-radius: var(--elegant-radius-lg);
+  border: var(--elegant-border-normal);
+  box-shadow: var(--elegant-shadow-sm);
+  transition: all var(--elegant-transition-normal);
+  cursor: pointer;
+}
+
+.elegant-component-node:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--elegant-shadow-md);
+  border-color: var(--elegant-accent-primary);
+}
+
+.elegant-component-node-label {
+  font-size: var(--elegant-font-small);
+  font-weight: 500;
+  color: var(--elegant-text-primary);
+  margin-top: var(--elegant-space-2);
+}
+
+.elegant-component-tree {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--elegant-space-4);
+}
+
+/* ==========================================================================
+   Elegant Utilities
+   ========================================================================== */
+.elegant-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--elegant-space-6);
+}
+
+.elegant-flex { display: flex; }
+.elegant-flex-col { display: flex; flex-direction: column; }
+.elegant-flex-center { display: flex; align-items: center; justify-content: center; }
+.elegant-between { display: flex; align-items: center; justify-content: space-between; }
+
+.elegant-gap-2 { gap: var(--elegant-space-2); }
+.elegant-gap-3 { gap: var(--elegant-space-3); }
+.elegant-gap-4 { gap: var(--elegant-space-4); }
+.elegant-gap-6 { gap: var(--elegant-space-6); }
+
+.elegant-mt-2 { margin-top: var(--elegant-space-2); }
+.elegant-mt-4 { margin-top: var(--elegant-space-4); }
+.elegant-mt-6 { margin-top: var(--elegant-space-6); }
+.elegant-mb-2 { margin-bottom: var(--elegant-space-2); }
+.elegant-mb-4 { margin-bottom: var(--elegant-space-4); }
+.elegant-mb-6 { margin-bottom: var(--elegant-space-6); }
+
+.elegant-p-3 { padding: var(--elegant-space-3); }
+.elegant-p-4 { padding: var(--elegant-space-4); }
+.elegant-p-6 { padding: var(--elegant-space-6); }
+
+.elegant-text-center { text-align: center; }
+.elegant-text-secondary { color: var(--elegant-text-secondary); }
+.elegant-text-tertiary { color: var(--elegant-text-tertiary); }
+.elegant-text-primary { color: var(--elegant-text-primary); }
+.elegant-text-success { color: var(--elegant-accent-success); }
+.elegant-text-warning { color: var(--elegant-accent-warning); }
+.elegant-text-danger { color: var(--elegant-accent-danger); }
+
+.elegant-w-full { width: 100%; }
+.elegant-max-w-md { max-width: 480px; }
+.elegant-max-w-lg { max-width: 640px; }
+.elegant-max-w-xl { max-width: 800px; }
+
+/* ==========================================================================
+   Elegant Icons / Avatars
+   ========================================================================== */
+.elegant-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--elegant-radius-sm);
+  background: var(--elegant-bg-tertiary);
+  color: var(--elegant-text-secondary);
+  font-size: 14px;
+  transition: all var(--elegant-transition-fast);
+}
+
+.elegant-icon-accent {
+  background: rgba(74, 144, 226, 0.12);
+  color: var(--elegant-accent-primary);
+}
+
+.elegant-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--elegant-radius-full);
+  background: var(--elegant-gradient-primary);
+  color: var(--elegant-text-inverse);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: var(--elegant-font-medium);
+  box-shadow: var(--elegant-shadow-sm);
+}
+
+.elegant-avatar-sm { width: 32px; height: 32px; font-size: var(--elegant-font-small); }
+.elegant-avatar-lg { width: 56px; height: 56px; font-size: var(--elegant-font-large); }
+
+/* ==========================================================================
+   Elegant Lists / Grid Layouts
+   ========================================================================== */
 .elegant-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--elegant-space-2);
 }
 
 .elegant-list-item {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--elegant-bg-tertiary);
+  display: flex;
+  align-items: center;
+  gap: var(--elegant-space-3);
+  padding: var(--elegant-space-3) var(--elegant-space-4);
+  border-radius: var(--elegant-radius-md);
   transition: background var(--elegant-transition-fast);
 }
 
 .elegant-list-item:hover {
-  background: var(--elegant-bg-primary);
-}
-
-.elegant-list-item:last-child {
-  border-bottom: none;
-}
-
-/* Elegant Typography */
-.elegant-heading-1 {
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--elegant-text-primary);
-  letter-spacing: -0.02em;
-  line-height: 1.2;
-  margin: 0 0 16px 0;
-}
-
-.elegant-heading-2 {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--elegant-text-primary);
-  letter-spacing: -0.01em;
-  line-height: 1.3;
-  margin: 0 0 12px 0;
-}
-
-.elegant-heading-3 {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--elegant-text-primary);
-  letter-spacing: -0.005em;
-  line-height: 1.4;
-  margin: 0 0 8px 0;
-}
-
-.elegant-text {
-  font-size: 14px;
-  color: var(--elegant-text-secondary);
-  line-height: 1.6;
-  margin: 0;
-}
-
-.elegant-text-small {
-  font-size: 12px;
-  color: var(--elegant-text-tertiary);
-  line-height: 1.5;
-}
-
-/* Elegant Dividers */
-.elegant-divider {
-  height: 1px;
   background: var(--elegant-bg-tertiary);
-  margin: 24px 0;
-  border: none;
 }
 
-/* Elegant Loading States */
-.elegant-skeleton {
-  background: linear-gradient(90deg, var(--elegant-bg-secondary) 25%, var(--elegant-bg-tertiary) 50%, var(--elegant-bg-secondary) 75%);
-  background-size: 200% 100%;
-  animation: elegant-shimmer 1.5s infinite;
-  border-radius: 8px;
-}
-
-@keyframes elegant-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
-/* Elegant Tooltips */
-.elegant-tooltip {
-  position: relative;
-  display: inline-block;
-}
-
-.elegant-tooltip::after {
-  content: attr(data-tooltip);
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%) translateY(-8px);
-  padding: 8px 12px;
-  background: var(--elegant-text-primary);
-  color: white;
-  font-size: 12px;
-  border-radius: 6px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity var(--elegant-transition-fast);
-  z-index: 1000;
-}
-
-.elegant-tooltip:hover::after {
-  opacity: 1;
-}
-
-/* Elegant Grid Layout */
-.elegant-grid {
-  display: grid;
-  gap: 24px;
-}
-
-.elegant-grid-2 {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.elegant-grid-3 {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.elegant-grid-4 {
-  grid-template-columns: repeat(4, 1fr);
-}
-
-@media (max-width: 1024px) {
-  .elegant-grid-4 {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
+.elegant-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--elegant-space-4); }
+.elegant-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--elegant-space-4); }
+.elegant-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--elegant-space-4); }
 
 @media (max-width: 768px) {
-  .elegant-grid-3 {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  .elegant-grid-4 {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  .elegant-grid-2, .elegant-grid-3, .elegant-grid-4 { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 480px) {
-  .elegant-grid-2 {
-    grid-template-columns: 1fr;
-  }
-  .elegant-grid-3 {
-    grid-template-columns: 1fr;
-  }
-  .elegant-grid-4 {
-    grid-template-columns: 1fr;
-  }
+/* ==========================================================================
+   Elegant Progress / Loading
+   ========================================================================== */
+.elegant-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(74, 144, 226, 0.15);
+  border-top-color: var(--elegant-accent-primary);
+  border-radius: 50%;
+  animation: elegant-spin 0.8s linear infinite;
 }
 
-/* Elegant Animations */
-@keyframes elegant-fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+@keyframes elegant-spin { to { transform: rotate(360deg); } }
+
+.elegant-progress {
+  height: 6px;
+  background: var(--elegant-bg-tertiary);
+  border-radius: var(--elegant-radius-full);
+  overflow: hidden;
 }
 
-@keyframes elegant-slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+.elegant-progress-bar {
+  height: 100%;
+  background: var(--elegant-gradient-primary);
+  border-radius: inherit;
+  transition: width var(--elegant-transition-normal);
 }
 
-.elegant-animate-fadeIn {
-  animation: elegant-fadeIn var(--elegant-transition-normal) ease-out;
+/* ==========================================================================
+   Elegant Decorative — Subtle accents for premium feel
+   ========================================================================== */
+.elegant-accent-line {
+  position: relative;
+  padding-left: var(--elegant-space-4);
 }
 
-.elegant-animate-slideIn {
-  animation: elegant-slideIn var(--elegant-transition-normal) ease-out;
+.elegant-accent-line::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0.2em; bottom: 0.2em;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--elegant-gradient-primary);
 }
 
-/* Elegant Focus States */
-.elegant-focusable:focus {
-  outline: 2px solid var(--elegant-accent-primary);
-  outline-offset: 2px;
+.elegant-highlight {
+  background: linear-gradient(180deg, transparent 55%, rgba(74, 144, 226, 0.18) 55%);
+  padding: 0 2px;
 }
 
-/* Elegant Scrollbar */
-.elegant-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.elegant-grain::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+  mix-blend-mode: overlay;
 }
 
-.elegant-scrollbar::-webkit-scrollbar-track {
-  background: var(--elegant-bg-secondary);
+/* ==========================================================================
+   Elegant Animations — smooth entrance
+   ========================================================================== */
+@keyframes elegant-fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes elegant-slide-in {
+  from { opacity: 0; transform: translateX(-16px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes elegant-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.elegant-animate-fade {
+  animation: elegant-fade-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.elegant-animate-slide {
+  animation: elegant-slide-in 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.elegant-animate-scale {
+  animation: elegant-scale-in 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.elegant-delay-1 { animation-delay: 0.05s; }
+.elegant-delay-2 { animation-delay: 0.1s; }
+.elegant-delay-3 { animation-delay: 0.15s; }
+.elegant-delay-4 { animation-delay: 0.2s; }
+
+/* ==========================================================================
+   OS-Specific Refinements (from detectOS)
+   ========================================================================== */
+.os-macos .elegant-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+}
+
+.os-macos .elegant-button {
+  border-radius: 10px;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.os-windows .elegant-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.os-windows .elegant-button {
   border-radius: 4px;
-}
-
-.elegant-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--elegant-text-tertiary);
-  border-radius: 4px;
-}
-
-.elegant-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--elegant-text-secondary);
-}
-
-/* Elegant Empty State */
-.elegant-empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 48px 24px;
-  text-align: center;
-}
-
-.elegant-empty-icon {
-  font-size: 48px;
-  color: var(--elegant-text-tertiary);
-  margin-bottom: 16px;
-}
-
-.elegant-empty-title {
-  font-size: 18px;
   font-weight: 600;
-  color: var(--elegant-text-primary);
-  margin: 0 0 8px 0;
 }
 
-.elegant-empty-text {
-  font-size: 14px;
-  color: var(--elegant-text-secondary);
-  margin: 0 0 24px 0;
-  max-width: 400px;
+.os-linux .elegant-card {
+  border-radius: 12px;
+}
+
+.os-ios .elegant-card {
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+}
+
+.os-ios .elegant-button {
+  border-radius: 12px;
+  padding: var(--elegant-space-4) var(--elegant-space-6);
+}
+
+.os-android .elegant-card {
+  border-radius: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.os-android .elegant-button {
+  border-radius: 20px;
+  text-transform: none;
+}
+
+/* ==========================================================================
+   Subtle Decorative Elements
+   ========================================================================== */
+.elegant-ornament {
+  display: inline-block;
+  color: var(--elegant-text-tertiary);
+  font-size: 1.5em;
+  letter-spacing: 0.3em;
+  user-select: none;
+}
+
+.elegant-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--elegant-space-4);
+  color: var(--elegant-text-tertiary);
+  font-size: var(--elegant-font-tiny);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: var(--elegant-space-8) 0;
+}
+
+.elegant-rule::before,
+.elegant-rule::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.08) 100%);
+}
+
+.elegant-rule::after {
+  background: linear-gradient(90deg,
+    rgba(0, 0, 0, 0.08) 0%,
+    transparent 100%);
 }

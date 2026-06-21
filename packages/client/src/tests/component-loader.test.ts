@@ -20,7 +20,7 @@ describe('ComponentLoader', () => {
   });
 
   it('should register runtime components', async () => {
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const id = 'runtime:test-comp';
     loader.registerRuntimeComponent({
       name: 'test-comp',
@@ -34,7 +34,7 @@ describe('ComponentLoader', () => {
   });
 
   it('should call mount hook on mount', async () => {
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const id = 'runtime:hook-comp';
     const mountHook = vi.fn();
     const unmountHook = vi.fn();
@@ -52,7 +52,7 @@ describe('ComponentLoader', () => {
   });
 
   it('should call unmount hook on unmount', async () => {
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const id = 'runtime:unmount-comp';
     const mountHook = vi.fn();
     const unmountHook = vi.fn();
@@ -71,7 +71,7 @@ describe('ComponentLoader', () => {
   });
 
   it('should handle async mount hooks', async () => {
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const id = 'runtime:async-comp';
     let resolved = false;
     loader.registerLifecycle(id, {
@@ -94,7 +94,7 @@ describe('ComponentLoader', () => {
   });
 
   it('should warn when mounting unknown component', async () => {
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const el = document.createElement('div');
     await loader.mountComponent('unknown:id', el);
@@ -103,7 +103,7 @@ describe('ComponentLoader', () => {
   });
 
   it('should filter components by plugin', async () => {
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     loader.registerRuntimeComponent({
       name: 'a',
       type: 'component',
@@ -126,14 +126,14 @@ describe('ComponentLoader', () => {
       ok: true,
       json: async () => ({ root: [], relationships: [] })
     });
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const tree = await loader.loadComponentTree();
     expect(tree).toEqual({ root: [], relationships: [] });
   });
 
   it('should return null when tree API fails', async () => {
     (global.fetch as any).mockResolvedValue({ ok: false });
-    const loader = await import('./component-loader');
+    const loader = await import('../component-loader');
     const tree = await loader.loadComponentTree();
     expect(tree).toBeNull();
   });

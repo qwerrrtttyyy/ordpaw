@@ -146,51 +146,87 @@ export function createModal(opts: {
 }
 
 /**
- * 检测操作系统类型
+ * 检测操作系统类型（含移动端 iOS / Android）
  */
-export type OSType = 'windows' | 'macos' | 'linux' | 'unknown';
+export type OSType = 'macos' | 'windows' | 'linux' | 'ios' | 'android' | 'unknown';
 
 export function detectOS(): OSType {
   if (typeof navigator === 'undefined') return 'unknown';
   const ua = navigator.userAgent.toLowerCase();
-  if (ua.includes('win')) return 'windows';
-  if (ua.includes('mac')) return 'macos';
-  if (ua.includes('linux')) return 'linux';
+  const platform = (navigator.platform || '').toLowerCase();
+  if (/iphone|ipad|ipod/.test(ua) || platform.startsWith('mac') && 'ontouchend' in document) {
+    // iPadOS 上 userAgent 会伪装成 Mac，触摸检测可区分
+    if (/iphone|ipod/.test(ua)) return 'ios';
+    if (platform === 'iphone' || platform === 'ipad' || platform === 'ipod') return 'ios';
+    // 同时有 maxTouchPoints 检测 iPadOS
+    if ((navigator as any).maxTouchPoints && (navigator as any).maxTouchPoints > 1) return 'ios';
+  }
+  if (/mac/.test(ua) || platform.startsWith('mac')) return 'macos';
+  if (/win/.test(ua) || platform.startsWith('win')) return 'windows';
+  if (/android/.test(ua)) return 'android';
+  if (/linux/.test(ua) || platform.startsWith('linux')) return 'linux';
   return 'unknown';
 }
 
 /**
  * 应用操作系统特定的样式效果
+ * 将 OSType 编码为 CSS 自定义属性（通过 html[data-os] 选择器可进一步自定义）
  */
 export function applyOSEffects(os: OSType) {
   const root = document.documentElement;
   root.setAttribute('data-os', os);
 
-  switch (os) {
-    case 'macos':
-      root.style.setProperty('--os-blur-intensity', '20px');
-      root.style.setProperty('--os-shadow-soft', '0 8px 32px rgba(0, 0, 0, 0.12)');
-      root.style.setProperty('--os-animation-curve', 'cubic-bezier(0.4, 0, 0.2, 1)');
-      root.style.setProperty('--os-border-radius', '12px');
-      break;
-    case 'windows':
-      root.style.setProperty('--os-blur-intensity', '10px');
-      root.style.setProperty('--os-shadow-soft', '0 4px 16px rgba(0, 0, 0, 0.15)');
-      root.style.setProperty('--os-animation-curve', 'cubic-bezier(0, 0, 1, 1)');
-      root.style.setProperty('--os-border-radius', '4px');
-      break;
-    case 'linux':
-      root.style.setProperty('--os-blur-intensity', '15px');
-      root.style.setProperty('--os-shadow-soft', '0 6px 24px rgba(0, 0, 0, 0.1)');
-      root.style.setProperty('--os-animation-curve', 'cubic-bezier(0.25, 0.1, 0.25, 1)');
-      root.style.setProperty('--os-border-radius', '8px');
-      break;
-    default:
-      root.style.setProperty('--os-blur-intensity', '12px');
-      root.style.setProperty('--os-shadow-soft', '0 4px 20px rgba(0, 0, 0, 0.1)');
-      root.style.setProperty('--os-animation-curve', 'ease-out');
-      root.style.setProperty('--os-border-radius', '8px');
-  }
+  const preset: Record<OSType, { blur: string; shadow: string; easing: string; radius: string; duration: number }> = {
+    macos: {
+      blur: '20px',
+      shadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+      easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      radius: '12px',
+      duration: 380
+    },
+    ios: {
+      blur: '24px',
+      shadow: '0 6px 24px rgba(0, 0, 0, 0.18)',
+      easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
+      radius: '14px',
+      duration: 320
+    },
+    windows: {
+      blur: '10px',
+      shadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+      easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)',
+      radius: '6px',
+      duration: 220
+    },
+    linux: {
+      blur: '15px',
+      shadow: '0 6px 24px rgba(0, 0, 0, 0.10)',
+      easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
+      radius: '9px',
+      duration: 300
+    },
+    android: {
+      blur: '12px',
+      shadow: '0 4px 20px rgba(0, 0, 0, 0.14)',
+      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      radius: '8px',
+      duration: 260
+    },
+    unknown: {
+      blur: '12px',
+      shadow: '0 4px 20px rgba(0, 0, 0, 0.10)',
+      easing: 'ease-out',
+      radius: '8px',
+      duration: 300
+    }
+  };
+
+  const p = preset[os];
+  root.style.setProperty('--os-blur-intensity', p.blur);
+  root.style.setProperty('--os-shadow-soft', p.shadow);
+  root.style.setProperty('--os-animation-curve', p.easing);
+  root.style.setProperty('--os-border-radius', p.radius);
+  root.style.setProperty('--os-animation-duration', `${p.duration}ms`);
 }
 
 /**
@@ -198,9 +234,11 @@ export function applyOSEffects(os: OSType) {
  */
 export function getOSAnimationDuration(os: OSType): number {
   switch (os) {
-    case 'macos': return 400;
-    case 'windows': return 250;
+    case 'macos': return 380;
+    case 'ios': return 320;
+    case 'windows': return 220;
     case 'linux': return 300;
+    case 'android': return 260;
     default: return 300;
   }
 }

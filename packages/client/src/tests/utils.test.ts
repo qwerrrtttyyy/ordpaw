@@ -54,24 +54,24 @@ describe('applyOSEffects', () => {
     applyOSEffects('windows');
     const root = document.documentElement;
     expect(root.style.getPropertyValue('--os-blur-intensity')).toBe('10px');
-    expect(root.style.getPropertyValue('--os-border-radius')).toBe('4px');
+    expect(root.style.getPropertyValue('--os-border-radius')).toBe('6px');
   });
 
   it('should set Linux-specific CSS variables', () => {
     applyOSEffects('linux');
     const root = document.documentElement;
     expect(root.style.getPropertyValue('--os-blur-intensity')).toBe('15px');
-    expect(root.style.getPropertyValue('--os-border-radius')).toBe('8px');
+    expect(root.style.getPropertyValue('--os-border-radius')).toBe('9px');
   });
 });
 
 describe('getOSAnimationDuration', () => {
-  it('should return 400 for macOS', () => {
-    expect(getOSAnimationDuration('macos')).toBe(400);
+  it('should return 380 for macOS', () => {
+    expect(getOSAnimationDuration('macos')).toBe(380);
   });
 
-  it('should return 250 for Windows', () => {
-    expect(getOSAnimationDuration('windows')).toBe(250);
+  it('should return 220 for Windows', () => {
+    expect(getOSAnimationDuration('windows')).toBe(220);
   });
 
   it('should return 300 for Linux', () => {
@@ -85,18 +85,18 @@ describe('getOSAnimationDuration', () => {
 
 describe('escapeHtml', () => {
   it('should escape HTML special characters', async () => {
-    const { escapeHtml } = await import('./utils');
+    const { escapeHtml } = await import('../utils');
     expect(escapeHtml('<script>alert("xss")</script>')).toBe('&lt;script&gt;alert("xss")&lt;/script&gt;');
   });
 
   it('should handle null and undefined', async () => {
-    const { escapeHtml } = await import('./utils');
+    const { escapeHtml } = await import('../utils');
     expect(escapeHtml(null)).toBe('');
     expect(escapeHtml(undefined)).toBe('');
   });
 
   it('should convert numbers to strings', async () => {
-    const { escapeHtml } = await import('./utils');
+    const { escapeHtml } = await import('../utils');
     expect(escapeHtml(42)).toBe('42');
   });
 });
@@ -112,27 +112,27 @@ describe('formatRelativeTime', () => {
   });
 
   it('should return "just now" for recent times', async () => {
-    const { formatRelativeTime } = await import('./utils');
+    const { formatRelativeTime } = await import('../utils');
     expect(formatRelativeTime(Date.now() - 30000, 'en-US')).toBe('just now');
   });
 
   it('should return minutes ago', async () => {
-    const { formatRelativeTime } = await import('./utils');
+    const { formatRelativeTime } = await import('../utils');
     expect(formatRelativeTime(Date.now() - 5 * 60_000, 'en-US')).toBe('5m ago');
   });
 
   it('should return hours ago', async () => {
-    const { formatRelativeTime } = await import('./utils');
+    const { formatRelativeTime } = await import('../utils');
     expect(formatRelativeTime(Date.now() - 3 * 3_600_000, 'en-US')).toBe('3h ago');
   });
 
   it('should return days ago', async () => {
-    const { formatRelativeTime } = await import('./utils');
+    const { formatRelativeTime } = await import('../utils');
     expect(formatRelativeTime(Date.now() - 2 * 86_400_000, 'en-US')).toBe('2d ago');
   });
 
   it('should return Chinese strings for zh-CN locale', async () => {
-    const { formatRelativeTime } = await import('./utils');
+    const { formatRelativeTime } = await import('../utils');
     expect(formatRelativeTime(Date.now() - 5 * 60_000, 'zh-CN')).toBe('5 分钟前');
   });
 });

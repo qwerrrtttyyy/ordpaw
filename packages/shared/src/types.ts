@@ -126,12 +126,22 @@ export interface CreateTestSuiteRequest {
 
 // === 插件 ===
 // === 前端组件贡献 ===
+export interface ComponentAnimation {
+  mount?: string;
+  unmount?: string;
+  interactive?: string;
+  duration?: number;
+  easing?: string;
+  disabled?: boolean;
+}
+
 export interface ComponentContribution {
-  type: 'css' | 'script' | 'component';
+  type: 'css' | 'script' | 'component' | 'view';
   name: string;
   src: string;
-  slot?: 'header' | 'sidebar' | 'dashboard' | 'settings' | 'view';
+  slot?: 'header' | 'sidebar' | 'dashboard' | 'settings' | 'view' | string;
   metadata?: Record<string, any>;
+  animation?: ComponentAnimation;
 }
 
 export interface PluginManifest {
