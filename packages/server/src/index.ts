@@ -15,6 +15,7 @@ import { componentServer } from './core/component-server.js';
 import { debugLogger } from './core/debug-logger.js';
 import { skillRunner } from './core/skill-runner.js';
 import { mcpClient } from './core/mcp-client.js';
+import { createLogger } from './core/logger.js';
 import {
   errorHandler,
   requestLogger,
@@ -23,6 +24,8 @@ import {
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+
+const startupLogger = createLogger('startup');
 
 let server: any = null;
 
@@ -53,7 +56,7 @@ async function start() {
     componentServer.loadFromDatabase();
     skillRunner.init();
     mcpClient.init();
-    console.log('✓ 数据库初始化完成');
+    startupLogger.info('数据库初始化完成');
 
     const app = express();
     const httpServer = createServer(app);
@@ -91,7 +94,7 @@ async function start() {
 
     // 加载插件（异步，不阻塞启动）
     loadPlugins().catch(err => {
-      console.error('✗ 插件加载失败:', err);
+      startupLogger.error('插件加载失败:', err);
     });
 
     // SPA 回退
@@ -114,10 +117,10 @@ async function start() {
     const PORT = parseInt(process.env.PORT || '3000', 10);
 
     httpServer.listen(PORT, () => {
-      console.log(`🚀 OrdPaw AI Agent Studio 已启动`);
-      console.log(`📡 HTTP: http://localhost:${PORT}`);
-      console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
-      console.log(`💚 Health: http://localhost:${PORT}/healthz`);
+      startupLogger.info(`OrdPaw AI Agent Studio 已启动`);
+      startupLogger.info(`HTTP: http://localhost:${PORT}`);
+      startupLogger.info(`WebSocket: ws://localhost:${PORT}`);
+      startupLogger.info(`Health: http://localhost:${PORT}/healthz`);
     });
 
     server = httpServer;
@@ -125,9 +128,9 @@ async function start() {
     // 优雅关闭
     setupGracefulShutdown(httpServer, wss);
   } catch (err) {
-    console.error('启动失败:', err);
-    process.exit(1);
-  }
+      startupLogger.error('启动失败:', err);
+      process.exit(1);
+    }
 }
 
 function setupGracefulShutdown(httpServer: any, wss: WebSocketServer) {
