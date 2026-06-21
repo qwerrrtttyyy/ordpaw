@@ -13,6 +13,8 @@ import { scriptMcp } from './core/script-mcp.js';
 import { providerService } from './core/provider-service.js';
 import { componentServer } from './core/component-server.js';
 import { debugLogger } from './core/debug-logger.js';
+import { skillRunner } from './core/skill-runner.js';
+import { mcpClient } from './core/mcp-client.js';
 import {
   errorHandler,
   requestLogger,
@@ -31,6 +33,8 @@ async function start() {
     scriptMcp.init();
     providerService.init();
     componentServer.loadFromDatabase();
+    skillRunner.init();
+    mcpClient.init();
     console.log('✓ 数据库初始化完成');
 
     const app = express();

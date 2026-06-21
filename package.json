@@ -1,6 +1,6 @@
 {
   "name": "ordpaw",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "OrdPaw — A powerful AI/Agent client",
   "private": true,
   "type": "module",

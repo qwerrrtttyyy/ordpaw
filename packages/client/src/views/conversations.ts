@@ -20,6 +20,18 @@ export class ConversationsView {
     const agents = await this.api.getAgents();
     const locale = this.store.getLocale();
 
+    const navigateToChat = (id: string, trigger?: HTMLElement) => {
+      const card = trigger?.closest('.conv-item') as HTMLElement | null;
+      if (card) {
+        card.classList.add('chat-opening');
+        setTimeout(() => {
+          window.location.hash = `#/chat/${encodeURIComponent(id)}`;
+        }, 260);
+      } else {
+        window.location.hash = `#/chat/${encodeURIComponent(id)}`;
+      }
+    };
+
     content.innerHTML = `
       <div class="slide-up">
         <div class="section-header">
@@ -51,7 +63,7 @@ export class ConversationsView {
             ${conversations.map((conv: any) => {
               const agent = agents.find(a => a.id === conv.agentId);
               return `
-                <div class="list-item accent">
+                <div class="list-item accent conv-item" data-id="${conv.id}">
                   <div class="list-item-icon">◈</div>
                   <div class="list-item-body">
                     <div class="list-item-title">${conv.title}</div>
@@ -61,6 +73,7 @@ export class ConversationsView {
                     </div>
                   </div>
                   <div class="list-item-actions">
+                    <button class="btn btn-ghost btn-sm open-btn" data-id="${conv.id}">打开</button>
                     <button class="btn btn-ghost btn-sm delete-btn" data-id="${conv.id}">${t('common.delete')}</button>
                   </div>
                 </div>
@@ -74,6 +87,25 @@ export class ConversationsView {
     const createHandler = () => this.showCreateModal(agents);
     document.getElementById('createConvBtn')?.addEventListener('click', createHandler);
     document.getElementById('emptyCreateBtn')?.addEventListener('click', createHandler);
+
+    // Click on conversation item to open chat
+    content.querySelectorAll('.conv-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.list-item-actions') || target.closest('.delete-btn') || target.closest('.open-btn')) return;
+        const id = (item as HTMLElement).getAttribute('data-id');
+        if (id) navigateToChat(id, target);
+      });
+    });
+
+    content.querySelectorAll('.open-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const target = e.currentTarget as HTMLElement;
+        const id = target.getAttribute('data-id');
+        if (id) navigateToChat(id, target);
+      });
+    });
 
     content.querySelectorAll('.delete-btn').forEach(btn => {
       btn.addEventListener('click', async (e) => {

@@ -167,6 +167,61 @@ export interface EventBus {
   emit(event: string, payload: any): Promise<void>;
 }
 
+// === MCP 服务端（持久化） ===
+export interface McpServer {
+  id: string;
+  name: string;
+  transport: 'stdio' | 'sse' | 'websocket';
+  command?: string;
+  url?: string;
+  env?: Record<string, string>;
+  enabled: boolean;
+  connected: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InstallMcpRequest {
+  name: string;
+  transport: 'stdio' | 'sse' | 'websocket';
+  command?: string;
+  url?: string;
+  env?: Record<string, string>;
+}
+
+// === 已安装技能（持久化） ===
+export interface InstalledSkill {
+  id: string;
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+  code: string;
+  source: 'builtin' | 'user';
+  enabled: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface InstallSkillRequest {
+  name: string;
+  description?: string;
+  code: string;
+  parameters?: Record<string, any>;
+}
+
+export interface SkillInstallResult {
+  id: string;
+  name: string;
+  description: string;
+  source: 'builtin' | 'user';
+}
+
+export interface SkillExecuteResult {
+  success: boolean;
+  output?: any;
+  error?: string;
+}
+
 // === 技能 ===
 export interface SkillDefinition {
   id: string;

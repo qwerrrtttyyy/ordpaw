@@ -176,6 +176,31 @@ export async function initDatabase(): Promise<Database> {
       updated_at INTEGER NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS mcp_servers (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      transport TEXT NOT NULL CHECK(transport IN ('stdio','sse','websocket')),
+      command TEXT,
+      url TEXT,
+      env_json TEXT DEFAULT '{}',
+      enabled INTEGER DEFAULT 1,
+      connected INTEGER DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS installed_skills (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT DEFAULT '',
+      parameters_json TEXT DEFAULT '{}',
+      code TEXT NOT NULL,
+      source TEXT DEFAULT 'user' CHECK(source IN ('builtin','user')),
+      enabled INTEGER DEFAULT 1,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
+    );
+
     CREATE INDEX IF NOT EXISTS idx_messages_conv ON messages(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_checkpoints_conv ON checkpoints(conversation_id);
     CREATE INDEX IF NOT EXISTS idx_conversations_agent ON conversations(agent_id);

@@ -11,7 +11,9 @@ export class MobileDrawer {
     prompts: 0,
     scripts: 0,
     providers: 0,
-    testSuites: 0
+    testSuites: 0,
+    mcpServers: 0,
+    installedSkills: 0
   };
 
   constructor() {
@@ -28,6 +30,8 @@ export class MobileDrawer {
   }
 
   render(): HTMLElement {
+    const mcpSkillsCount = (this.stats.mcpServers || 0) + (this.stats.installedSkills || 0);
+
     this.drawer.innerHTML = `
       <div class="sidebar-header">
         <div class="brand">
@@ -59,6 +63,11 @@ export class MobileDrawer {
 
       <nav class="nav-section">
         <div class="nav-label">${t('nav.extensions')}</div>
+        <div class="nav-item" data-route="#/mcp-skills">
+          <span class="nav-icon">⚡</span>
+          <span>${t('nav.mcpSkills')}</span>
+          <span class="nav-badge">${mcpSkillsCount}</span>
+        </div>
         <div class="nav-item" data-route="#/plugins">
           <span class="nav-icon">◇</span>
           <span>${t('nav.plugins')}</span>

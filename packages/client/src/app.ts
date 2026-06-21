@@ -15,6 +15,8 @@ import { ProvidersView } from './views/providers';
 import { TestsView } from './views/tests';
 import { SettingsView } from './views/settings';
 import { DownloadManagerView } from './views/download-manager';
+import { ChatView } from './views/chat';
+import { McpSkillsView } from './views/mcp-skills';
 import { t, setLocale } from './i18n';
 import type { Locale, PerformanceTier } from '@ordpaw/shared';
 import { loadPluginComponents } from './component-loader';
@@ -42,6 +44,7 @@ export class App {
   private ws: WebSocket | null = null;
   private sequenceExecutor: SequenceExecutor | null = null;
   private downloadManager: DownloadManager;
+  private currentChatView: ChatView | null = null;
 
   constructor() {
     this.api = new API();
@@ -61,6 +64,7 @@ export class App {
   async init() {
     const app = document.getElementById('app');
     if (!app) return;
+    app.classList.add('ordpaw-app');
 
     await this.loadSettings();
     this.applyTheme();
@@ -109,12 +113,6 @@ export class App {
     });
   }
 
-  /**
-   * Reload the plugin component manifest from the server and inject any new
-   * CSS/script contributions. Called after a plugin is installed/uninstalled
-   * at runtime — fixes the prior issue where users had to refresh the page
-   * to see newly-installed plugin contributions.
-   */
   async reloadPluginComponents() {
     try {
       await loadPluginComponents();
@@ -126,10 +124,6 @@ export class App {
   private initWebSocket() {
     try {
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Honor Vite dev proxy: if the page is served from the dev server,
-      // use the same host:port (the proxy forwards /ws to the backend).
-      // In production, fall back to explicit port 3000 only when the page
-      // itself isn't already on 3000.
       const wsHost = window.location.hostname;
       const wsPort = window.location.port && window.location.port !== '5173'
         ? window.location.port
@@ -140,6 +134,7 @@ export class App {
 
       this.ws.onopen = () => {
         console.log('[App] WebSocket 已连接');
+        window.__ordpaw = { ws: this.ws!, version: '0.0.2', OrdPaw: (window as any).OrdPaw };
         this.sequenceExecutor = new SequenceExecutor(this.router, this.store);
         this.sequenceExecutor.connect(this.ws!);
       };
@@ -272,7 +267,6 @@ export class App {
     } else if (newEffects !== this.lastAppliedEffects || newPerformance !== this.lastAppliedPerformance) {
       this.lastAppliedEffects = newEffects;
       this.lastAppliedPerformance = newPerformance;
-      // Effects and performance mode are CSS-driven; no rebuild required.
     }
   }
 
@@ -369,6 +363,11 @@ export class App {
         title: t('download.title'),
         crumbs: 'OrdPaw · Downloads',
         view: () => new DownloadManagerView(this.api, this.store, this.downloadManager).render()
+      },
+      '#/mcp-skills': {
+        title: t('nav.mcpSkills'),
+        crumbs: 'OrdPaw · MCP & Skills',
+        view: () => new McpSkillsView(this.api).init(document.getElementById('view-content')!)
       }
     };
     const meta = routeMap[this.currentRoute];
@@ -389,7 +388,8 @@ export class App {
       '#/tests': { title: t('test.title'), crumbs: 'OrdPaw · Tests' },
       '#/debug': { title: t('debug.title'), crumbs: 'OrdPaw · Debug' },
       '#/settings': { title: t('settings.title'), crumbs: 'OrdPaw · Settings' },
-      '#/download': { title: t('download.title'), crumbs: 'OrdPaw · Downloads' }
+      '#/download': { title: t('download.title'), crumbs: 'OrdPaw · Downloads' },
+      '#/mcp-skills': { title: t('nav.mcpSkills'), crumbs: 'OrdPaw · MCP & Skills' }
     };
     const meta = routeMap[this.currentRoute];
     if (meta) {
@@ -454,15 +454,63 @@ export class App {
         title: t('download.title'),
         crumbs: 'OrdPaw · Downloads',
         view: () => new DownloadManagerView(this.api, this.store, this.downloadManager).render()
+      },
+      '#/mcp-skills': {
+        title: t('nav.mcpSkills'),
+        crumbs: 'OrdPaw · MCP & Skills',
+        view: () => new McpSkillsView(this.api).init(document.getElementById('view-content')!)
       }
     };
 
     for (const [route, meta] of Object.entries(routeMap)) {
       this.router.on(route, () => this.renderView(meta.view, meta.title, meta.crumbs));
     }
+
+    // Chat route (parameterized)
+    this.router.on('#/chat/:conversationId', (params) => {
+      const id = params.conversationId;
+      this.renderChat(id);
+    });
+  }
+
+  private async renderChat(conversationId: string) {
+    this.currentRoute = `#/chat/${conversationId}`;
+    this.sidebar.setActive('#/conversations');
+    this.mobileDrawer.setActive('#/conversations');
+    this.bottomNav.setActive('#/conversations');
+    this.titleEl.textContent = t('chat.title');
+    this.crumbsEl.textContent = 'OrdPaw · Chat';
+
+    // Tear down any previous ChatView
+    if (this.currentChatView) {
+      this.currentChatView.destroy();
+      this.currentChatView = null;
+    }
+
+    const content = document.getElementById('view-content');
+    if (!content) return;
+    content.innerHTML = '';
+
+    const chatView = new ChatView(this.api, conversationId);
+    this.currentChatView = chatView;
+    try {
+      await chatView.init(content);
+    } catch (err) {
+      console.error('Chat 视图渲染失败:', err);
+      content.innerHTML = `<div class="empty-state"><p>加载对话失败</p></div>`;
+    }
   }
 
   private async renderView(renderFn: () => Promise<void>, title: string, crumbs: string) {
+    // Tear down ChatView if navigating away from chat
+    if (this.currentChatView && !this.currentRoute.startsWith('#/chat/')) {
+      // Already handled
+    }
+    if (this.currentChatView) {
+      this.currentChatView.destroy();
+      this.currentChatView = null;
+    }
+
     this.currentRoute = window.location.hash || '#/';
     this.titleEl.textContent = title;
     this.crumbsEl.textContent = crumbs;

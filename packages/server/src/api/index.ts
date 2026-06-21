@@ -4,6 +4,7 @@ import { agentRuntime } from '../core/agent-runtime.js';
 import { sessionManager } from '../core/session.js';
 import { checkpointManager } from '../core/checkpoint.js';
 import { skillRunner } from '../core/skill-runner.js';
+import { mcpClient } from '../core/mcp-client.js';
 import { scriptMcp } from '../core/script-mcp.js';
 import { providerService } from '../core/provider-service.js';
 import { testSuiteManager } from '../core/test-suite.js';
@@ -258,6 +259,61 @@ export function setupApiRoutes(app: any) {
   router.get('/skills', asyncHandler(async (req: Request, res: Response) => {
     const skills = skillRunner.listSkills();
     res.json(skills);
+  }));
+
+  router.get('/skills/installed', asyncHandler(async (req: Request, res: Response) => {
+    res.json(skillRunner.listInstalled());
+  }));
+
+  router.post('/skills/install', asyncHandler(async (req: Request, res: Response) => {
+    const { name, description, code, parameters } = req.body || {};
+    if (!name || !code) throw ApiError.badRequest('缺少必要字段 name 或 code');
+    const result = await skillRunner.installSkill({ name, description, code, parameters });
+    statsCache.delete('stats');
+    res.status(201).json(result);
+  }));
+
+  router.post('/skills/:id/execute', asyncHandler(async (req: Request, res: Response) => {
+    const { params, context } = req.body || {};
+    const result = await skillRunner.executeSkill(req.params.id, params || {}, context || {});
+    res.json(result);
+  }));
+
+  router.delete('/skills/:id', asyncHandler(async (req: Request, res: Response) => {
+    const ok = skillRunner.uninstallSkill(req.params.id);
+    if (!ok) throw ApiError.notFound('技能不存在');
+    statsCache.delete('stats');
+    res.json({ success: true });
+  }));
+
+  // ============ MCP Server API ============
+  router.get('/mcp', asyncHandler(async (req: Request, res: Response) => {
+    res.json(mcpClient.listServers());
+  }));
+
+  router.post('/mcp', asyncHandler(async (req: Request, res: Response) => {
+    const { name, transport, command, url, env } = req.body || {};
+    if (!name || !transport) throw ApiError.badRequest('缺少必要字段 name 或 transport');
+    const server = await mcpClient.installServer({ name, transport, command, url, env });
+    statsCache.delete('stats');
+    res.status(201).json(server);
+  }));
+
+  router.post('/mcp/:id/connect', asyncHandler(async (req: Request, res: Response) => {
+    const server = await mcpClient.connectServer(req.params.id);
+    res.json(server);
+  }));
+
+  router.post('/mcp/:id/disconnect', asyncHandler(async (req: Request, res: Response) => {
+    const server = await mcpClient.disconnectServer(req.params.id);
+    res.json(server);
+  }));
+
+  router.delete('/mcp/:id', asyncHandler(async (req: Request, res: Response) => {
+    const ok = mcpClient.uninstallServer(req.params.id);
+    if (!ok) throw ApiError.notFound('MCP 服务不存在');
+    statsCache.delete('stats');
+    res.json({ success: true });
   }));
 
   // ============ 提示词库 API ============
@@ -528,6 +584,8 @@ export function setupApiRoutes(app: any) {
       prompts: dbSafeCount(db, 'SELECT COUNT(*) as count FROM prompts'),
       scripts: dbSafeCount(db, 'SELECT COUNT(*) as count FROM scripts'),
       skills: skillRunner.listSkills().length,
+      installedSkills: skillRunner.listInstalled().length,
+      mcpServers: dbSafeCount(db, 'SELECT COUNT(*) as count FROM mcp_servers'),
       providers: dbSafeCount(db, 'SELECT COUNT(*) as count FROM providers'),
       testSuites: dbSafeCount(db, 'SELECT COUNT(*) as count FROM test_suites')
     };
@@ -620,6 +678,12 @@ export function setupApiRoutes(app: any) {
     if (scope === 'all' || scope === 'plugins') {
       data.plugins = queryAll('SELECT * FROM plugins');
     }
+    if (scope === 'all' || scope === 'mcp') {
+      data.mcpServers = queryAll('SELECT * FROM mcp_servers');
+    }
+    if (scope === 'all' || scope === 'skills') {
+      data.installedSkills = queryAll('SELECT * FROM installed_skills');
+    }
 
     res.setHeader('Content-Disposition', `attachment; filename="agent-studio-export-${Date.now()}.json"`);
     res.json(data);
@@ -687,6 +751,8 @@ export function setupApiRoutes(app: any) {
     if (data.testCases) insertIf('test_cases', data.testCases, ['id','suite_id','name','input','expected_output','expected_contains_json','variables_json','created_at','updated_at']);
     if (data.testRuns) insertIf('test_runs', data.testRuns, ['id','suite_id','agent_id','results_json','passed','failed','created_at']);
     if (data.plugins) insertIf('plugins', data.plugins, ['id','name','version','description','manifest_json','config_json','state','enabled']);
+    if (data.mcpServers) insertIf('mcp_servers', data.mcpServers, ['id','name','transport','command','url','env_json','enabled','connected','created_at','updated_at']);
+    if (data.installedSkills) insertIf('installed_skills', data.installedSkills, ['id','name','description','parameters_json','code','source','enabled','created_at','updated_at']);
 
     saveDatabase();
     statsCache.clear();
