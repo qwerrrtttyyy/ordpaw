@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import vm from 'node:vm';
 import type { Script, ScriptExecutionResult, ScriptTool, ScriptToolCall } from '@ordpaw/shared';
-import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
 import { queryAll, queryOne } from '../db/utils.js';
@@ -284,7 +284,10 @@ export class ScriptMcp {
     const { tool, params } = call;
     switch (tool) {
       case 'script_create': {
-        const script = this.createScript({ name: params.name, description: params.description });
+        const script = this.createScript({
+          name: String(params.name),
+          description: String(params.description || ''),
+        });
         return {
           success: true,
           output: { id: script.id, name: script.name },
@@ -294,26 +297,26 @@ export class ScriptMcp {
       }
       case 'script_write':
       case 'script_save': {
-        const script = this.getScript(params.name);
+        const script = this.getScript(String(params.name));
         if (script) {
           this.updateScript(script.id, {
-            code: params.code,
-            language: params.language,
-            description: params.description,
+            code: String(params.code),
+            language: String(params.language || '') as Script['language'],
+            description: String(params.description || ''),
           });
         } else {
           this.createScript({
-            name: params.name,
-            code: params.code,
-            description: params.description,
-            language: params.language,
+            name: String(params.name),
+            code: String(params.code),
+            description: String(params.description || ''),
+            language: this.normalizeLanguage(String(params.language || '')),
           });
         }
         return { success: true, output: { name: params.name }, logs: [], duration: 0 };
       }
       case 'script_delete':
       case 'script_remove': {
-        const ok = this.deleteScript(params.name);
+        const ok = this.deleteScript(String(params.name));
         return { success: ok, output: { deleted: ok }, logs: [], duration: 0 };
       }
       case 'script_list': {
@@ -326,7 +329,10 @@ export class ScriptMcp {
         };
       }
       case 'script_use': {
-        return this.executeScript(params.name, params.args || {});
+        return this.executeScript(
+          String(params.name),
+          (params.args as Record<string, unknown>) || {}
+        );
       }
       default:
         return { success: false, error: `Unknown tool: ${tool}`, logs: [], duration: 0 };

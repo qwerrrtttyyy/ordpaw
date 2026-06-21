@@ -3,6 +3,7 @@ import type {
   Conversation,
   PromptTemplate,
   PluginInstance,
+  InstalledSkill,
   Settings,
   Script,
   ScriptExecutionResult,
@@ -26,18 +27,16 @@ import type {
   SkillExecuteResult,
   StatsResponse,
 } from '@ordpaw/shared';
-import { OrdPawError, OrdPawErrorCode, type ErrorCode } from '@ordpaw/shared/errors';
-
-export { ErrorCode };
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors';
 
 export class OrdPawApiError extends OrdPawError {
-  constructor(message: string, status: number, code?: ErrorCode, details?: unknown) {
+  constructor(message: string, status: number, code?: string, details?: unknown) {
     super(message, { status, code: code || statusToCode(status), details });
     this.name = 'OrdPawApiError';
   }
 }
 
-function statusToCode(status: number): ErrorCode {
+function statusToCode(status: number): string {
   if (status === 400) return 'bad_request';
   if (status === 401) return 'unauthorized';
   if (status === 403) return 'forbidden';
@@ -45,7 +44,7 @@ function statusToCode(status: number): ErrorCode {
   if (status === 409) return 'conflict';
   if (status === 429) return 'rate_limited';
   if (status >= 500) return 'server';
-  return OrdPawErrorCode.UNKNOWN.toLowerCase() as ErrorCode;
+  return OrdPawErrorCode.UNKNOWN.toLowerCase() as string;
 }
 
 interface CacheEntry<T> {
@@ -347,8 +346,8 @@ export class API {
   }
 
   // === Skill / MCP API ===
-  async getSkills(): Promise<unknown[]> {
-    return request<unknown[]>(`${this.baseUrl}/skills`);
+  async getSkills(): Promise<InstalledSkill[]> {
+    return request<InstalledSkill[]>(`${this.baseUrl}/skills`);
   }
   async installSkill(data: InstallSkillRequest): Promise<SkillInstallResult> {
     return request<SkillInstallResult>(`${this.baseUrl}/skills/install`, {

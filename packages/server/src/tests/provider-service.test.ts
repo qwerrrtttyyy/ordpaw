@@ -8,8 +8,8 @@ vi.mock('../db/index.js', () => ({
   saveDatabase: vi.fn(),
   default: {
     getDatabase: () => memoryDb,
-    saveDatabase: vi.fn()
-  }
+    saveDatabase: vi.fn(),
+  },
 }));
 
 describe('ProviderService', () => {
@@ -23,9 +23,9 @@ describe('ProviderService', () => {
     providerService.init();
 
     const providers = providerService.listProviders();
-    expect(providers.some(p => p.name === 'OpenAI')).toBe(true);
-    expect(providers.some(p => p.name === 'Anthropic')).toBe(true);
-    expect(providers.some(p => p.name === 'Ollama')).toBe(true);
+    expect(providers.some((p) => p.name === 'OpenAI')).toBe(true);
+    expect(providers.some((p) => p.name === 'Anthropic')).toBe(true);
+    expect(providers.some((p) => p.name === 'Ollama')).toBe(true);
   });
 
   it('does not duplicate built-ins on repeated init', async () => {
@@ -44,7 +44,7 @@ describe('ProviderService', () => {
     const { providerService } = await import('../core/provider-service.js');
     providerService.init();
 
-    const openai = providerService.listProviders().find(p => p.name === 'OpenAI')!;
+    const openai = providerService.listProviders().find((p) => p.name === 'OpenAI')!;
     expect(providerService.getProvider(openai.id)?.name).toBe('OpenAI');
     expect(providerService.getProvider('openai')?.name).toBe('OpenAI');
     expect(providerService.getProviderByName('OpenAI')?.name).toBe('OpenAI');
@@ -62,7 +62,7 @@ describe('ProviderService', () => {
       apiKey: 'secret-key',
       apiKeyName: 'custom',
       models: [{ id: 'm1', name: 'Model 1' }],
-      config: { timeout: 30 }
+      config: { timeout: 30 },
     });
 
     expect(created.name).toBe('Custom');
@@ -82,7 +82,7 @@ describe('ProviderService', () => {
     const created = providerService.createProvider({
       name: 'KeyTest',
       type: 'custom',
-      apiKey: 'my-key'
+      apiKey: 'my-key',
     });
 
     const stored = providerService.getProvider(created.id);
@@ -95,13 +95,13 @@ describe('ProviderService', () => {
 
     const created = providerService.createProvider({
       name: 'ToUpdate',
-      type: 'custom'
+      type: 'custom',
     });
 
     const updated = providerService.updateProvider(created.id, {
       name: 'Updated',
       baseUrl: 'http://new',
-      enabled: false
+      enabled: false,
     });
 
     expect(updated?.name).toBe('Updated');
@@ -120,13 +120,13 @@ describe('ProviderService', () => {
 
     const created = providerService.createProvider({
       name: 'ToDelete',
-      type: 'custom'
+      type: 'custom',
     });
 
     expect(providerService.deleteProvider(created.id)).toBe(true);
     expect(providerService.getProvider(created.id)).toBeNull();
 
-    const openai = providerService.listProviders().find(p => p.name === 'OpenAI')!;
+    const openai = providerService.listProviders().find((p) => p.name === 'OpenAI')!;
     expect(providerService.deleteProvider(openai.id)).toBe(false);
   });
 
@@ -134,7 +134,7 @@ describe('ProviderService', () => {
     const { providerService } = await import('../core/provider-service.js');
     providerService.init();
 
-    const openai = providerService.listProviders().find(p => p.name === 'OpenAI')!;
+    const openai = providerService.listProviders().find((p) => p.name === 'OpenAI')!;
     const models = providerService.getModels(openai.id);
     expect(models.length).toBeGreaterThan(0);
     expect(models[0]).toHaveProperty('id');
@@ -144,7 +144,11 @@ describe('ProviderService', () => {
   it('handles listProviders database errors gracefully', async () => {
     const { providerService } = await import('../core/provider-service.js');
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    memoryDb = { exec: () => { throw new Error('db down'); } };
+    memoryDb = {
+      exec: () => {
+        throw new Error('db down');
+      },
+    };
 
     const providers = providerService.listProviders();
     expect(providers).toEqual([]);

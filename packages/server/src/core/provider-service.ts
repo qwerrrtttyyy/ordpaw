@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Provider, ModelInfo, CreateProviderRequest } from '@ordpaw/shared';
+import type { BindParams } from 'sql.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
 import { obfuscateApiKey, deobfuscateApiKey } from './api-key-crypto.js';
@@ -31,10 +32,10 @@ const BUILT_IN_PROVIDERS: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>[] = [
       { id: 'gpt-4o', name: 'GPT-4o' },
       { id: 'gpt-4o-mini', name: 'GPT-4o Mini' },
       { id: 'gpt-4-turbo', name: 'GPT-4 Turbo' },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' }
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo' },
     ],
     enabled: true,
-    isBuiltIn: true
+    isBuiltIn: true,
   },
   {
     name: 'Anthropic',
@@ -45,10 +46,10 @@ const BUILT_IN_PROVIDERS: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>[] = [
     models: [
       { id: 'claude-3-5-sonnet', name: 'Claude 3.5 Sonnet' },
       { id: 'claude-3-opus', name: 'Claude 3 Opus' },
-      { id: 'claude-3-haiku', name: 'Claude 3 Haiku' }
+      { id: 'claude-3-haiku', name: 'Claude 3 Haiku' },
     ],
     enabled: true,
-    isBuiltIn: true
+    isBuiltIn: true,
   },
   {
     name: 'Ollama',
@@ -59,11 +60,11 @@ const BUILT_IN_PROVIDERS: Omit<Provider, 'id' | 'createdAt' | 'updatedAt'>[] = [
     models: [
       { id: 'llama3', name: 'Llama 3' },
       { id: 'mistral', name: 'Mistral' },
-      { id: 'qwen2', name: 'Qwen 2' }
+      { id: 'qwen2', name: 'Qwen 2' },
     ],
     enabled: true,
-    isBuiltIn: true
-  }
+    isBuiltIn: true,
+  },
 ];
 
 export class ProviderService {
@@ -74,8 +75,11 @@ export class ProviderService {
   listProviders(): Provider[] {
     try {
       const db = getDatabase();
-      const rows = queryAll<ProviderRow>(db, 'SELECT * FROM providers ORDER BY is_built_in DESC, name ASC');
-      return rows.map(row => this.rowToProvider(row));
+      const rows = queryAll<ProviderRow>(
+        db,
+        'SELECT * FROM providers ORDER BY is_built_in DESC, name ASC'
+      );
+      return rows.map((row) => this.rowToProvider(row));
     } catch (err) {
       logger.error(err, 'listProviders 错误:');
       return [];
@@ -86,8 +90,14 @@ export class ProviderService {
     try {
       const db = getDatabase();
       let row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE id = ?', [idOrType]);
-      if (!row) row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE type = ? LIMIT 1', [idOrType]);
-      if (!row) row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE name = ? LIMIT 1', [idOrType]);
+      if (!row)
+        row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE type = ? LIMIT 1', [
+          idOrType,
+        ]);
+      if (!row)
+        row = queryOne<ProviderRow>(db, 'SELECT * FROM providers WHERE name = ? LIMIT 1', [
+          idOrType,
+        ]);
       return row ? this.rowToProvider(row) : null;
     } catch (err) {
       logger.error(err, 'getProvider 错误:');
@@ -119,10 +129,24 @@ export class ProviderService {
     const models = Array.isArray(data.models) ? data.models : [];
     const config = data.config || {};
 
-    db.run(`
+    db.run(
+      `
       INSERT INTO providers (id, name, type, base_url, api_key, api_key_name, models_json, enabled, is_built_in, config_json, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, 1, 0, ?, ?, ?)
-    `, [id, safeName, safeType, safeBaseUrl, safeApiKey, safeApiKeyName, JSON.stringify(models), JSON.stringify(config), now, now]);
+    `,
+      [
+        id,
+        safeName,
+        safeType,
+        safeBaseUrl,
+        safeApiKey,
+        safeApiKeyName,
+        JSON.stringify(models),
+        JSON.stringify(config),
+        now,
+        now,
+      ]
+    );
 
     saveDatabase();
     return this.getProvider(id)!;
@@ -170,7 +194,7 @@ export class ProviderService {
       updates.push('updated_at = ?');
       params.push(Date.now());
       params.push(id);
-      db.run(`UPDATE providers SET ${updates.join(', ')} WHERE id = ?`, params);
+      db.run(`UPDATE providers SET ${updates.join(', ')} WHERE id = ?`, params as BindParams);
       saveDatabase();
     }
 
@@ -198,17 +222,32 @@ export class ProviderService {
 
   private ensureBuiltIns() {
     const existing = this.listProviders();
-    const existingNames = new Set(existing.map(p => p.name));
+    const existingNames = new Set(existing.map((p) => p.name));
 
     for (const builtIn of BUILT_IN_PROVIDERS) {
       if (existingNames.has(builtIn.name)) continue;
       const db = getDatabase();
       const now = Date.now();
       const id = uuidv4();
-      db.run(`
+      db.run(
+        `
         INSERT INTO providers (id, name, type, base_url, api_key, api_key_name, models_json, enabled, is_built_in, config_json, created_at, updated_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)
-      `, [id, builtIn.name, builtIn.type, builtIn.baseUrl || '', builtIn.apiKey || '', builtIn.apiKeyName || '', JSON.stringify(builtIn.models), builtIn.enabled ? 1 : 0, JSON.stringify(builtIn.config || {}), now, now]);
+      `,
+        [
+          id,
+          builtIn.name,
+          builtIn.type,
+          builtIn.baseUrl || '',
+          builtIn.apiKey || '',
+          builtIn.apiKeyName || '',
+          JSON.stringify(builtIn.models),
+          builtIn.enabled ? 1 : 0,
+          JSON.stringify(builtIn.config || {}),
+          now,
+          now,
+        ]
+      );
     }
 
     saveDatabase();
@@ -228,7 +267,7 @@ export class ProviderService {
       isBuiltIn: p.is_built_in === 1,
       config: safeJsonParse<Record<string, unknown>>(p.config_json, {}),
       createdAt: p.created_at,
-      updatedAt: p.updated_at
+      updatedAt: p.updated_at,
     };
   }
 }

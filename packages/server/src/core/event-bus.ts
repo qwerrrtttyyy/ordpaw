@@ -18,9 +18,13 @@ class EventBusImpl {
   }
 
   async emit(event: string, payload: unknown): Promise<void> {
-    const enrichedPayload = payload && typeof payload === 'object'
-      ? { ...(payload as Record<string, unknown>), __eventMeta: { type: event, time: Date.now() } }
-      : { value: payload, __eventMeta: { type: event, time: Date.now() } };
+    const enrichedPayload =
+      payload && typeof payload === 'object'
+        ? {
+            ...(payload as Record<string, unknown>),
+            __eventMeta: { type: event, time: Date.now() },
+          }
+        : { value: payload, __eventMeta: { type: event, time: Date.now() } };
 
     const targets = [this.listeners.get(event), this.listeners.get('*')];
     for (const set of targets) {

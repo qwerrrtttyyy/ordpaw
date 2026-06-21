@@ -2,7 +2,8 @@ export const zh = {
   'app.name': 'OrdPaw',
   'app.tag': 'Agent Studio',
   'app.welcome.title': '欢迎使用 OrdPaw',
-  'app.welcome.subtitle': '简洁、温暖、有机的 AI Agent 工作台。构建、调试、管理你的智能体，连接 Skills 与 MCP 协议。',
+  'app.welcome.subtitle':
+    '简洁、温暖、有机的 AI Agent 工作台。构建、调试、管理你的智能体，连接 Skills 与 MCP 协议。',
   'app.welcome.createAgent': '创建 Agent',
   'app.welcome.newConversation': '新建会话',
   'nav.workspace': '工作区',
@@ -72,7 +73,8 @@ export const zh = {
   'provider.type': '类型',
   'provider.models': '模型',
   'provider.name': '服务商名称',
-  'provider.description': '可自由配置 OpenAI、Anthropic、Ollama 或自定义兼容 OpenAI 的 API 服务商。',
+  'provider.description':
+    '可自由配置 OpenAI、Anthropic、Ollama 或自定义兼容 OpenAI 的 API 服务商。',
   'provider.deleteConfirm': '确定删除此服务商？',
   'conversation.title': '会话管理',
   'conversation.new': '新建会话',

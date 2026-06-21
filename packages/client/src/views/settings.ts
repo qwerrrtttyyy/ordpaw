@@ -1,9 +1,18 @@
 import { API } from '../api';
 import { Store } from '../store';
 import { t } from '../i18n';
-import type { ThemeId, Locale } from '@ordpaw/shared';
+import type { ThemeId, Locale, Settings } from '@ordpaw/shared';
 
-const THEMES: ThemeId[] = ['ordpaw-light', 'ordpaw-dark', 'ordpaw-twilight', 'minimal', 'forest', 'ocean', 'neon', 'material'];
+const THEMES: ThemeId[] = [
+  'ordpaw-light',
+  'ordpaw-dark',
+  'ordpaw-twilight',
+  'minimal',
+  'forest',
+  'ocean',
+  'neon',
+  'material',
+];
 
 export class SettingsView {
   private api: API;
@@ -115,13 +124,15 @@ export class SettingsView {
             </div>
           </div>
           <div class="theme-grid">
-            ${THEMES.map(theme => `
+            ${THEMES.map(
+              (theme) => `
               <div class="theme-card ${currentTheme === theme ? 'active' : ''}" data-theme="${theme}">
                 <div class="theme-preview" style="${this.themePreviewStyle(theme)}"></div>
-                <div class="theme-name">${t(`theme.${theme}` as any)}</div>
+                <div class="theme-name">${t(`theme.${theme}`)}</div>
                 <div class="theme-desc">${this.themeDesc(theme, currentLocale)}</div>
               </div>
-            `).join('')}
+            `
+            ).join('')}
           </div>
         </div>
 
@@ -197,9 +208,11 @@ export class SettingsView {
             </div>
           </div>
           <div class="text-sm text-secondary" style="line-height: 1.8;">
-            ${isEn
-              ? 'OrdPaw is a simple, warm, organic AI Agent workbench.<br>Supports Skills, MCP, checkpoints, session management, debug mode, and prompt library.<br>Event-driven plugin system for flexible Agent capabilities.'
-              : 'OrdPaw 是一个简洁、温暖、有机的 AI Agent 工作台。<br>支持 Skills、MCP、检查点、会话管理、调试模式、提示词库。<br>基于事件驱动的插件系统，灵活扩展 Agent 能力。'}
+            ${
+              isEn
+                ? 'OrdPaw is a simple, warm, organic AI Agent workbench.<br>Supports Skills, MCP, checkpoints, session management, debug mode, and prompt library.<br>Event-driven plugin system for flexible Agent capabilities.'
+                : 'OrdPaw 是一个简洁、温暖、有机的 AI Agent 工作台。<br>支持 Skills、MCP、检查点、会话管理、调试模式、提示词库。<br>基于事件驱动的插件系统，灵活扩展 Agent 能力。'
+            }
           </div>
         </div>
 
@@ -322,7 +335,7 @@ export class SettingsView {
     `;
 
     // Locale buttons
-    content.querySelectorAll('[data-locale]').forEach(btn => {
+    content.querySelectorAll('[data-locale]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const locale = (btn as HTMLElement).getAttribute('data-locale') as Locale;
         await this.api.updateSettings({ locale });
@@ -408,13 +421,13 @@ export class SettingsView {
     });
 
     // Theme cards
-    content.querySelectorAll('.theme-card').forEach(card => {
+    content.querySelectorAll('.theme-card').forEach((card) => {
       card.addEventListener('click', async () => {
         const theme = (card.getAttribute('data-theme') || 'ordpaw-light') as ThemeId;
         await this.api.updateSettings({ theme });
         this.store.setTheme(theme);
         this.onThemeChange();
-        content.querySelectorAll('.theme-card').forEach(c => c.classList.remove('active'));
+        content.querySelectorAll('.theme-card').forEach((c) => c.classList.remove('active'));
         card.classList.add('active');
       });
     });
@@ -428,8 +441,11 @@ export class SettingsView {
 
     // Save system settings
     document.getElementById('saveSystemSettings')?.addEventListener('click', async () => {
-      const logLevel = (document.getElementById('logLevel') as HTMLSelectElement)?.value as any;
-      const checkpointStrategy = (document.getElementById('checkpointStrategy') as HTMLSelectElement)?.value as any;
+      const logLevel = (document.getElementById('logLevel') as HTMLSelectElement)
+        ?.value as Settings['logLevel'];
+      const checkpointStrategy = (
+        document.getElementById('checkpointStrategy') as HTMLSelectElement
+      )?.value as Settings['checkpointStrategy'];
       await this.api.updateSettings({ logLevel, checkpointStrategy });
       this.store.setSettings({ logLevel, checkpointStrategy });
       this.toast(t('settings.saved'));
@@ -444,9 +460,11 @@ export class SettingsView {
     });
 
     // Download storage radios toggle
-    content.querySelectorAll<HTMLInputElement>('input[name="downloadStorage"]').forEach(radio => {
+    content.querySelectorAll<HTMLInputElement>('input[name="downloadStorage"]').forEach((radio) => {
       radio.addEventListener('change', () => {
-        const value = (document.querySelector('input[name="downloadStorage"]:checked') as HTMLInputElement)?.value;
+        const value = (
+          document.querySelector('input[name="downloadStorage"]:checked') as HTMLInputElement
+        )?.value;
         const browserGroup = document.getElementById('browserBackendGroup');
         const serverGroup = document.getElementById('serverPathGroup');
         if (browserGroup) browserGroup.style.display = value === 'browser' ? '' : 'none';
@@ -456,18 +474,29 @@ export class SettingsView {
 
     // Save download settings
     document.getElementById('saveDownloadSettings')?.addEventListener('click', async () => {
-      const downloadStorage = (document.querySelector('input[name="downloadStorage"]:checked') as HTMLInputElement)?.value as 'browser' | 'server';
-      const browserStorageBackend = (document.getElementById('browserBackend') as HTMLSelectElement)?.value as 'indexeddb' | 'fsa' | 'localstorage';
-      const serverPath = (document.getElementById('serverDownloadPath') as HTMLInputElement)?.value || './downloads';
-      const browserQuotaMb = parseInt((document.getElementById('browserQuotaMb') as HTMLInputElement)?.value || '500', 10);
-      const serverQuotaMb = parseInt((document.getElementById('serverQuotaMb') as HTMLInputElement)?.value || '2048', 10);
-      const enforce = (document.getElementById('enforceQuota') as HTMLInputElement)?.checked ?? true;
+      const downloadStorage = (
+        document.querySelector('input[name="downloadStorage"]:checked') as HTMLInputElement
+      )?.value as 'browser' | 'server';
+      const browserStorageBackend = (document.getElementById('browserBackend') as HTMLSelectElement)
+        ?.value as 'indexeddb' | 'fsa' | 'localstorage';
+      const serverPath =
+        (document.getElementById('serverDownloadPath') as HTMLInputElement)?.value || './downloads';
+      const browserQuotaMb = parseInt(
+        (document.getElementById('browserQuotaMb') as HTMLInputElement)?.value || '500',
+        10
+      );
+      const serverQuotaMb = parseInt(
+        (document.getElementById('serverQuotaMb') as HTMLInputElement)?.value || '2048',
+        10
+      );
+      const enforce =
+        (document.getElementById('enforceQuota') as HTMLInputElement)?.checked ?? true;
 
       const storageQuota = {
         browserMaxBytes: Math.max(1, browserQuotaMb) * 1024 * 1024,
         serverMaxBytes: Math.max(1, serverQuotaMb) * 1024 * 1024,
         enforce,
-        serverPath
+        serverPath,
       };
 
       await this.api.updateSettings({ downloadStorage, browserStorageBackend, storageQuota });
@@ -477,7 +506,14 @@ export class SettingsView {
 
     // Reset settings
     document.getElementById('resetSettingsBtn')?.addEventListener('click', async () => {
-      if (!confirm(isEn ? 'Are you sure you want to reset all settings to defaults?' : '确定要重置所有设置为默认值吗？')) return;
+      if (
+        !confirm(
+          isEn
+            ? 'Are you sure you want to reset all settings to defaults?'
+            : '确定要重置所有设置为默认值吗？'
+        )
+      )
+        return;
       await this.api.resetSettings();
       const fresh = await this.api.getSettings();
       this.store.setSettings(fresh);
@@ -488,18 +524,29 @@ export class SettingsView {
 
     // Clear data
     document.getElementById('clearDataBtn')?.addEventListener('click', async () => {
-      const checked = Array.from(content.querySelectorAll<HTMLInputElement>('.clear-target:checked')).map(el => el.value);
+      const checked = Array.from(
+        content.querySelectorAll<HTMLInputElement>('.clear-target:checked')
+      ).map((el) => el.value);
       if (checked.length === 0) {
         this.toast(isEn ? 'Please select data to clear' : '请选择要清除的数据');
         return;
       }
-      if (!confirm(isEn ? `Clear ${checked.join(', ')}? This cannot be undone.` : `确定要清除 ${checked.join('、')} 吗？此操作不可撤销。`)) return;
+      if (
+        !confirm(
+          isEn
+            ? `Clear ${checked.join(', ')}? This cannot be undone.`
+            : `确定要清除 ${checked.join('、')} 吗？此操作不可撤销。`
+        )
+      )
+        return;
       const result = await this.api.clearData(checked);
-      this.toast(isEn ? `Cleared: ${result.cleared.join(', ')}` : `已清除: ${result.cleared.join('、')}`);
+      this.toast(
+        isEn ? `Cleared: ${result.cleared.join(', ')}` : `已清除: ${result.cleared.join('、')}`
+      );
     });
 
     // Export buttons
-    content.querySelectorAll('[data-export-scope]').forEach(btn => {
+    content.querySelectorAll('[data-export-scope]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         const scope = (btn as HTMLElement).getAttribute('data-export-scope') || 'all';
         const data = await this.api.exportData(scope);
@@ -524,9 +571,18 @@ export class SettingsView {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (!confirm(isEn ? 'Import data? Existing data with same IDs will be overwritten.' : '导入数据？相同 ID 的现有数据将被覆盖。')) return;
+        if (
+          !confirm(
+            isEn
+              ? 'Import data? Existing data with same IDs will be overwritten.'
+              : '导入数据？相同 ID 的现有数据将被覆盖。'
+          )
+        )
+          return;
         const result = await this.api.importData(data);
-        this.toast(isEn ? `Imported: ${result.imported.join(', ')}` : `已导入: ${result.imported.join('、')}`);
+        this.toast(
+          isEn ? `Imported: ${result.imported.join(', ')}` : `已导入: ${result.imported.join('、')}`
+        );
       } catch (err) {
         this.toast(isEn ? 'Import failed: invalid file' : '导入失败: 无效文件');
       }
@@ -535,14 +591,17 @@ export class SettingsView {
 
   private themePreviewStyle(theme: ThemeId): string {
     const previews: Record<ThemeId, string> = {
-      'ordpaw-light': 'background: linear-gradient(135deg, #faf7f2 0%, #ebe4d8 100%); color: #d97757;',
-      'ordpaw-dark': 'background: linear-gradient(135deg, #1a1814 0%, #2a271f 100%); color: #e89473;',
-      'ordpaw-twilight': 'background: linear-gradient(135deg, #1e1b2e 0%, #322d4a 100%); color: #b794f6;',
-      'minimal': 'background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); color: #000000;',
-      'forest': 'background: linear-gradient(135deg, #f4f7f4 0%, #e3f0e6 100%); color: #4a7c59;',
-      'ocean': 'background: linear-gradient(135deg, #f0f5fa 0%, #e3eef8 100%); color: #2a7cc6;',
-      'neon': 'background: linear-gradient(135deg, #0a0a12 0%, #181826 100%); color: #00f0ff;',
-      'material': 'background: linear-gradient(135deg, #f2f5f9 0%, #e9eef6 100%); color: #6750a4;'
+      'ordpaw-light':
+        'background: linear-gradient(135deg, #faf7f2 0%, #ebe4d8 100%); color: #d97757;',
+      'ordpaw-dark':
+        'background: linear-gradient(135deg, #1a1814 0%, #2a271f 100%); color: #e89473;',
+      'ordpaw-twilight':
+        'background: linear-gradient(135deg, #1e1b2e 0%, #322d4a 100%); color: #b794f6;',
+      minimal: 'background: linear-gradient(135deg, #ffffff 0%, #f0f0f0 100%); color: #000000;',
+      forest: 'background: linear-gradient(135deg, #f4f7f4 0%, #e3f0e6 100%); color: #4a7c59;',
+      ocean: 'background: linear-gradient(135deg, #f0f5fa 0%, #e3eef8 100%); color: #2a7cc6;',
+      neon: 'background: linear-gradient(135deg, #0a0a12 0%, #181826 100%); color: #00f0ff;',
+      material: 'background: linear-gradient(135deg, #f2f5f9 0%, #e9eef6 100%); color: #6750a4;',
     };
     return previews[theme];
   }
@@ -552,11 +611,11 @@ export class SettingsView {
       'ordpaw-light': { zh: '温暖、有机的默认主题', en: 'Warm, organic default' },
       'ordpaw-dark': { zh: '舒适的暗色模式', en: 'Comfortable dark mode' },
       'ordpaw-twilight': { zh: '深邃神秘的紫色调', en: 'Deep mysterious violet' },
-      'minimal': { zh: '极简黑白，专注内容', en: 'Minimal black & white' },
-      'forest': { zh: '森林绿意，自然清新', en: 'Fresh forest green' },
-      'ocean': { zh: '深海蓝色，沉静专业', en: 'Calm deep blue' },
-      'neon': { zh: '霓虹赛博，高对比', en: 'Neon cyberpunk' },
-      'material': { zh: 'Material You 多彩', en: 'Material You colorful' }
+      minimal: { zh: '极简黑白，专注内容', en: 'Minimal black & white' },
+      forest: { zh: '森林绿意，自然清新', en: 'Fresh forest green' },
+      ocean: { zh: '深海蓝色，沉静专业', en: 'Calm deep blue' },
+      neon: { zh: '霓虹赛博，高对比', en: 'Neon cyberpunk' },
+      material: { zh: 'Material You 多彩', en: 'Material You colorful' },
     };
     return desc[theme][locale === 'en-US' ? 'en' : 'zh'];
   }

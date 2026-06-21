@@ -2,6 +2,7 @@ import { API } from '../api';
 import { Store } from '../store';
 import { t } from '../i18n';
 import { formatRelativeTime } from '../utils';
+import type { Agent, Conversation } from '@ordpaw/shared';
 
 export class ConversationsView {
   private api: API;
@@ -45,30 +46,38 @@ export class ConversationsView {
           </button>
         </div>
 
-        ${conversations.length === 0 ? `
+        ${
+          conversations.length === 0
+            ? `
           <div class="card">
             <div class="empty-state">
               <div class="empty-state-icon">◈</div>
               <div class="empty-state-title">${t('conversation.empty')}</div>
               <div class="text-sm text-muted mb-4">${t('conversation.emptyHint') || '选择一个 Agent 开始对话'}</div>
-              ${agents.length > 0 ? `
+              ${
+                agents.length > 0
+                  ? `
                 <button class="btn btn-primary" id="emptyCreateBtn">${t('app.welcome.newConversation')}</button>
-              ` : `
+              `
+                  : `
                 <p class="text-sm text-muted">${t('conversation.createAgentFirst') || '先创建 Agent 后才能新建会话'}</p>
-              `}
+              `
+              }
             </div>
           </div>
-        ` : `
+        `
+            : `
           <div class="grid grid-2">
-            ${conversations.map((conv: any) => {
-              const agent = agents.find(a => a.id === conv.agentId);
-              return `
+            ${conversations
+              .map((conv: Conversation) => {
+                const agent = agents.find((a) => a.id === conv.agentId);
+                return `
                 <div class="list-item accent conv-item" data-id="${conv.id}">
                   <div class="list-item-icon">◈</div>
                   <div class="list-item-body">
                     <div class="list-item-title">${conv.title}</div>
                     <div class="list-item-meta">
-                      <span class="badge badge-accent badge-dot">${agent?.name || (t('conversation.unlinked') || '未关联')}</span>
+                      <span class="badge badge-accent badge-dot">${agent?.name || t('conversation.unlinked') || '未关联'}</span>
                       <span>${formatRelativeTime(conv.updatedAt, locale)}</span>
                     </div>
                   </div>
@@ -78,9 +87,11 @@ export class ConversationsView {
                   </div>
                 </div>
               `;
-            }).join('')}
+              })
+              .join('')}
           </div>
-        `}
+        `
+        }
       </div>
     `;
 
@@ -89,16 +100,21 @@ export class ConversationsView {
     document.getElementById('emptyCreateBtn')?.addEventListener('click', createHandler);
 
     // Click on conversation item to open chat
-    content.querySelectorAll('.conv-item').forEach(item => {
+    content.querySelectorAll('.conv-item').forEach((item) => {
       item.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
-        if (target.closest('.list-item-actions') || target.closest('.delete-btn') || target.closest('.open-btn')) return;
+        if (
+          target.closest('.list-item-actions') ||
+          target.closest('.delete-btn') ||
+          target.closest('.open-btn')
+        )
+          return;
         const id = (item as HTMLElement).getAttribute('data-id');
         if (id) navigateToChat(id, target);
       });
     });
 
-    content.querySelectorAll('.open-btn').forEach(btn => {
+    content.querySelectorAll('.open-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const target = e.currentTarget as HTMLElement;
@@ -107,11 +123,14 @@ export class ConversationsView {
       });
     });
 
-    content.querySelectorAll('.delete-btn').forEach(btn => {
+    content.querySelectorAll('.delete-btn').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
-        if (id && confirm(t('conversation.deleteConfirm') || '确定删除此会话？所有消息和检查点都将丢失。')) {
+        if (
+          id &&
+          confirm(t('conversation.deleteConfirm') || '确定删除此会话？所有消息和检查点都将丢失。')
+        ) {
           await this.api.deleteConversation(id);
           this.render();
         }
@@ -119,7 +138,7 @@ export class ConversationsView {
     });
   }
 
-  private showCreateModal(agents: any[]) {
+  private showCreateModal(agents: Agent[]) {
     if (agents.length === 0) {
       alert(t('conversation.createAgentFirst') || '请先创建 Agent');
       return;
@@ -135,7 +154,7 @@ export class ConversationsView {
         <div class="form-group">
           <label class="form-label">${t('conversation.selectAgent')}</label>
           <select class="select" id="agentSelect">
-            ${agents.map(a => `<option value="${a.id}">${a.name}</option>`).join('')}
+            ${agents.map((a) => `<option value="${a.id}">${a.name}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -158,7 +177,10 @@ export class ConversationsView {
     });
     overlay.querySelector('#confirmBtn')?.addEventListener('click', async () => {
       const agentId = (overlay.querySelector('#agentSelect') as HTMLSelectElement)?.value;
-      const title = (overlay.querySelector('#convTitle') as HTMLInputElement)?.value || (t('conversation.newSession') || '新会话');
+      const title =
+        (overlay.querySelector('#convTitle') as HTMLInputElement)?.value ||
+        t('conversation.newSession') ||
+        '新会话';
       if (agentId) {
         await this.api.createConversation(agentId, title);
         close();

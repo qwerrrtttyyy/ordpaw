@@ -2,7 +2,15 @@ import { API } from '../api';
 import { Store } from '../store';
 import { t } from '../i18n';
 import { DownloadManager } from '../download-manager';
-import type { DownloadItem, StorageLocation, BrowserStorageBackend, Agent, Conversation, Script } from '@ordpaw/shared';
+import type {
+  DownloadItem,
+  StorageLocation,
+  BrowserStorageBackend,
+  Agent,
+  Conversation,
+  Script,
+  InstalledSkill,
+} from '@ordpaw/shared';
 
 interface ResourceGroup {
   type: DownloadItem['type'];
@@ -120,7 +128,7 @@ export class DownloadManagerView {
       this.api.getConversations(),
       this.api.getScripts(),
       this.api.getSkills(),
-      this.api.getAgents()
+      this.api.getAgents(),
     ]);
 
     const groups: ResourceGroup[] = [
@@ -130,8 +138,8 @@ export class DownloadManagerView {
         items: (conversations || []).map((c: Conversation) => ({
           id: c.id,
           type: 'conversation' as const,
-          name: c.title || `Conversation ${c.id.slice(0, 8)}`
-        }))
+          name: c.title || `Conversation ${c.id.slice(0, 8)}`,
+        })),
       },
       {
         type: 'code',
@@ -139,17 +147,17 @@ export class DownloadManagerView {
         items: (scripts || []).map((s: Script) => ({
           id: s.id,
           type: 'code' as const,
-          name: s.name || `Script ${s.id.slice(0, 8)}`
-        }))
+          name: s.name || `Script ${s.id.slice(0, 8)}`,
+        })),
       },
       {
         type: 'skill',
         label: 'Skills',
-        items: (skills || []).map((s: any) => ({
+        items: (skills || []).map((s: InstalledSkill) => ({
           id: s.id,
           type: 'skill' as const,
-          name: s.name || `Skill ${s.id.slice(0, 8)}`
-        }))
+          name: s.name || `Skill ${s.id.slice(0, 8)}`,
+        })),
       },
       {
         type: 'mcp',
@@ -159,39 +167,48 @@ export class DownloadManagerView {
           .map((a: Agent) => ({
             id: a.id,
             type: 'mcp' as const,
-            name: `${a.name} MCP`
-          }))
+            name: `${a.name} MCP`,
+          })),
       },
       {
         type: 'source',
         label: t('download.sourceCode'),
-        items: [{ id: 'source', type: 'source' as const, name: t('download.sourceCode') }]
-      }
+        items: [{ id: 'source', type: 'source' as const, name: t('download.sourceCode') }],
+      },
     ];
 
     this.resources = groups;
   }
 
   private renderResourceList(): string {
-    const groups = this.currentFilter === 'all'
-      ? this.resources
-      : this.resources.filter(g => g.type === this.currentFilter);
+    const groups =
+      this.currentFilter === 'all'
+        ? this.resources
+        : this.resources.filter((g) => g.type === this.currentFilter);
 
-    if (groups.every(g => g.items.length === 0)) {
+    if (groups.every((g) => g.items.length === 0)) {
       return `<div class="empty-state"><div class="empty-state-title">${t('common.empty')}</div></div>`;
     }
 
-    return groups.map(g => `
+    return groups
+      .map(
+        (g) => `
       <div style="margin-bottom: 16px;">
         <div class="text-sm fw-500 mb-2" style="color: var(--ord-text-secondary);">${g.label}</div>
-        ${g.items.map(item => `
+        ${g.items
+          .map(
+            (item) => `
           <label class="flex items-center gap-2" style="padding: 8px 0; border-bottom: 1px solid var(--ord-divider); cursor: pointer;">
             <input type="checkbox" class="resource-checkbox" value="${item.id}" data-type="${item.type}" data-name="${escapeHtml(item.name || item.id)}" ${this.selectedIds.has(item.id) ? 'checked' : ''}>
             <span class="text-sm">${escapeHtml(item.name || item.id)}</span>
           </label>
-        `).join('')}
+        `
+          )
+          .join('')}
       </div>
-    `).join('');
+    `
+      )
+      .join('');
   }
 
   private renderTaskList(): string {
@@ -200,7 +217,10 @@ export class DownloadManagerView {
       return `<div class="empty-state"><div class="empty-state-title">${t('download.noTasks')}</div></div>`;
     }
 
-    return tasks.map(task => `
+    return (
+      tasks
+        .map(
+          (task) => `
       <div class="task-row" style="padding: 12px 0; border-bottom: 1px solid var(--ord-divider);">
         <div class="flex items-center justify-between mb-2">
           <div>
@@ -219,17 +239,21 @@ export class DownloadManagerView {
         </div>
         ${task.error ? `<div class="text-xs text-danger mt-1">${escapeHtml(task.error)}</div>` : ''}
       </div>
-    `).join('') + `
+    `
+        )
+        .join('') +
+      `
       <div class="flex justify-end mt-3">
         <button class="btn btn-ghost btn-sm" id="clearCompletedBtn">${t('common.clear')}</button>
       </div>
-    `;
+    `
+    );
   }
 
   private renderTaskListInto(container: HTMLElement | null) {
     if (!container) return;
     container.innerHTML = this.renderTaskList();
-    container.querySelectorAll<HTMLElement>('[data-action]').forEach(btn => {
+    container.querySelectorAll<HTMLElement>('[data-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const action = btn.getAttribute('data-action');
         const taskId = btn.getAttribute('data-task');
@@ -247,12 +271,18 @@ export class DownloadManagerView {
 
   private statusLabel(status: DownloadItem['type'] | string): string {
     switch (status) {
-      case 'completed': return t('download.completed');
-      case 'failed': return t('download.failed');
-      case 'cancelled': return t('download.cancelled');
-      case 'paused': return t('download.paused');
-      case 'running': return t('download.running');
-      default: return t('common.loading');
+      case 'completed':
+        return t('download.completed');
+      case 'failed':
+        return t('download.failed');
+      case 'cancelled':
+        return t('download.cancelled');
+      case 'paused':
+        return t('download.paused');
+      case 'running':
+        return t('download.running');
+      default:
+        return t('common.loading');
     }
   }
 
@@ -264,14 +294,14 @@ export class DownloadManagerView {
       this.renderTaskListInto(content.querySelector('#task-list') as HTMLElement);
     });
 
-    content.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach(btn => {
+    content.querySelectorAll<HTMLButtonElement>('[data-filter]').forEach((btn) => {
       btn.addEventListener('click', () => {
         this.currentFilter = btn.getAttribute('data-filter') as DownloadItem['type'] | 'all';
         const list = content.querySelector('#resource-list') as HTMLElement;
         if (list) list.innerHTML = this.renderResourceList();
         this.bindCheckboxEvents();
         // refresh active class
-        content.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('active'));
+        content.querySelectorAll('[data-filter]').forEach((b) => b.classList.remove('active'));
         btn.classList.add('active');
       });
     });
@@ -280,7 +310,7 @@ export class DownloadManagerView {
 
     document.getElementById('selectAllBtn')?.addEventListener('click', () => {
       const visible = this.getVisibleItems();
-      visible.forEach(i => this.selectedIds.add(i.id));
+      visible.forEach((i) => this.selectedIds.add(i.id));
       this.refreshCheckboxes();
     });
 
@@ -306,7 +336,7 @@ export class DownloadManagerView {
   private bindCheckboxEvents() {
     const content = document.getElementById('view-content');
     if (!content) return;
-    content.querySelectorAll<HTMLInputElement>('.resource-checkbox').forEach(cb => {
+    content.querySelectorAll<HTMLInputElement>('.resource-checkbox').forEach((cb) => {
       cb.addEventListener('change', () => {
         const id = cb.value;
         if (cb.checked) {
@@ -321,28 +351,31 @@ export class DownloadManagerView {
   private refreshCheckboxes() {
     const content = document.getElementById('view-content');
     if (!content) return;
-    content.querySelectorAll<HTMLInputElement>('.resource-checkbox').forEach(cb => {
+    content.querySelectorAll<HTMLInputElement>('.resource-checkbox').forEach((cb) => {
       cb.checked = this.selectedIds.has(cb.value);
     });
   }
 
   private getVisibleItems(): DownloadItem[] {
-    const groups = this.currentFilter === 'all'
-      ? this.resources
-      : this.resources.filter(g => g.type === this.currentFilter);
-    return groups.flatMap(g => g.items);
+    const groups =
+      this.currentFilter === 'all'
+        ? this.resources
+        : this.resources.filter((g) => g.type === this.currentFilter);
+    return groups.flatMap((g) => g.items);
   }
 
   private async startDownload() {
     const visible = this.getVisibleItems();
-    const selected = visible.filter(i => this.selectedIds.has(i.id));
+    const selected = visible.filter((i) => this.selectedIds.has(i.id));
     if (selected.length === 0) {
       this.toast(t('common.empty'));
       return;
     }
 
-    const storage = (document.getElementById('storageLocation') as HTMLSelectElement)?.value as StorageLocation;
-    const backend = (document.getElementById('browserBackendSelect') as HTMLSelectElement)?.value as BrowserStorageBackend;
+    const storage = (document.getElementById('storageLocation') as HTMLSelectElement)
+      ?.value as StorageLocation;
+    const backend = (document.getElementById('browserBackendSelect') as HTMLSelectElement)
+      ?.value as BrowserStorageBackend;
     this.downloadManager.setBrowserBackend(backend);
 
     if (storage === 'browser' && backend === 'fsa') {
@@ -353,9 +386,10 @@ export class DownloadManagerView {
       }
     }
 
-    const serverPath = storage === 'server'
-      ? (document.getElementById('serverPathInput') as HTMLInputElement)?.value || './downloads'
-      : undefined;
+    const serverPath =
+      storage === 'server'
+        ? (document.getElementById('serverPathInput') as HTMLInputElement)?.value || './downloads'
+        : undefined;
 
     this.downloadManager.addTask(selected, { storage, serverPath });
     this.toast(t('download.startDownload'));

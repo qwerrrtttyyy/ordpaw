@@ -39,7 +39,7 @@ export class Cache<V = unknown> {
   }
 
   keys(): string[] {
-    return Array.from(this.store.keys()).filter(k => this.has(k));
+    return Array.from(this.store.keys()).filter((k) => this.has(k));
   }
 
   size(): number {

@@ -26,7 +26,10 @@ describe('eventBus', () => {
     eventBus.on('primitive', listener);
     await eventBus.emit('primitive', 42);
 
-    expect(listener.mock.calls[0][0]).toMatchObject({ value: 42, __eventMeta: { type: 'primitive' } });
+    expect(listener.mock.calls[0][0]).toMatchObject({
+      value: 42,
+      __eventMeta: { type: 'primitive' },
+    });
   });
 
   it('supports wildcard listeners', async () => {
@@ -70,7 +73,7 @@ describe('eventBus', () => {
     const { eventBus } = await import('../core/event-bus.js');
     let called = false;
     const listener = async () => {
-      await new Promise(resolve => setTimeout(resolve, 10));
+      await new Promise((resolve) => setTimeout(resolve, 10));
       called = true;
     };
 

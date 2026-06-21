@@ -29,45 +29,51 @@ export class TestsView {
         </button>
       </div>
 
-      ${suites.length === 0 ? `
+      ${
+        suites.length === 0
+          ? `
         <div class="empty-state">
           <div class="empty-state-icon">▣</div>
           <div class="empty-state-title">${t('common.empty')}</div>
           <div class="text-sm text-muted">${t('test.createSuite')}</div>
         </div>
-      ` : `
+      `
+          : `
         <div class="grid grid-2" id="suites-list">
-          ${suites.map(s => this.renderSuiteCard(s)).join('')}
+          ${suites.map((s) => this.renderSuiteCard(s)).join('')}
         </div>
-      `}
+      `
+      }
     `;
 
-    document.getElementById('createSuiteBtn')?.addEventListener('click', () => this.showSuiteModal());
-    content.querySelectorAll('.suite-edit').forEach(btn => {
+    document
+      .getElementById('createSuiteBtn')
+      ?.addEventListener('click', () => this.showSuiteModal());
+    content.querySelectorAll('.suite-edit').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.showSuiteModal(id);
       });
     });
-    content.querySelectorAll('.suite-run').forEach(btn => {
+    content.querySelectorAll('.suite-run').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.runSuite(id);
       });
     });
-    content.querySelectorAll('.suite-delete').forEach(btn => {
+    content.querySelectorAll('.suite-delete').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id && confirm(t('test.deleteConfirm'))) this.deleteSuite(id);
       });
     });
-    content.querySelectorAll('.suite-add-case').forEach(btn => {
+    content.querySelectorAll('.suite-add-case').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.showCaseModal(id);
       });
     });
-    content.querySelectorAll('.suite-view-runs').forEach(btn => {
+    content.querySelectorAll('.suite-view-runs').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.showRuns(id);
@@ -76,7 +82,7 @@ export class TestsView {
   }
 
   private renderSuiteCard(s: TestSuite) {
-    const agent = this.agents.find(a => a.id === s.agentId);
+    const agent = this.agents.find((a) => a.id === s.agentId);
     return `
       <div class="card">
         <div class="card-header">
@@ -87,11 +93,15 @@ export class TestsView {
           <span class="badge badge-sage">${s.cases.length} ${t('test.cases')}</span>
         </div>
         <div class="text-sm text-secondary mb-2">Agent: ${this.escapeHtml(agent?.name || '-')}</div>
-        ${s.cases.length > 0 ? `
+        ${
+          s.cases.length > 0
+            ? `
           <div class="mb-3">
-            ${s.cases.map(c => `<div class="text-sm">• ${this.escapeHtml(c.name)}</div>`).join('')}
+            ${s.cases.map((c) => `<div class="text-sm">• ${this.escapeHtml(c.name)}</div>`).join('')}
           </div>
-        ` : ''}
+        `
+            : ''
+        }
         <div class="flex gap-2" style="justify-content:flex-end; flex-wrap:wrap">
           <button class="btn btn-sm btn-secondary suite-add-case" data-id="${s.id}">+ ${t('test.addCase')}</button>
           <button class="btn btn-sm btn-primary suite-run" data-id="${s.id}">▶ ${t('test.run')}</button>
@@ -121,7 +131,7 @@ export class TestsView {
         <div class="form-group">
           <label class="form-label">Agent</label>
           <select class="input" id="suiteAgent">
-            ${this.agents.map(a => `<option value="${a.id}" ${suite?.agentId === a.id ? 'selected' : ''}>${this.escapeHtml(a.name)}</option>`).join('')}
+            ${this.agents.map((a) => `<option value="${a.id}" ${suite?.agentId === a.id ? 'selected' : ''}>${this.escapeHtml(a.name)}</option>`).join('')}
           </select>
         </div>
         <div class="form-group">
@@ -191,7 +201,12 @@ export class TestsView {
       const input = (document.getElementById('caseInput') as HTMLTextAreaElement).value.trim();
       const contains = (document.getElementById('caseContains') as HTMLInputElement).value.trim();
       if (!name || !input) return;
-      const expectedContains = contains ? contains.split(',').map(s => s.trim()).filter(Boolean) : [];
+      const expectedContains = contains
+        ? contains
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [];
       await this.api.createTestCase(suiteId, { name, input, expectedContains });
       close();
       await this.render();
@@ -209,11 +224,15 @@ export class TestsView {
       resultEl.innerHTML = `
         <div class="card" style="background:var(--ord-bg-sunken)">
           <div class="text-sm mb-2">${t('test.passed')}: ${run.passed} / ${t('test.failed')}: ${run.failed}</div>
-          ${run.results.map(r => `
+          ${run.results
+            .map(
+              (r) => `
             <div class="text-sm ${r.passed ? 'text-sage' : 'text-coral'}">
               ${r.passed ? '✓' : '✗'} ${this.escapeHtml(r.output.slice(0, 120))}${r.output.length > 120 ? '...' : ''}
             </div>
-          `).join('')}
+          `
+            )
+            .join('')}
         </div>
       `;
     }
@@ -229,16 +248,28 @@ export class TestsView {
           <div class="modal-title">${t('test.runs')}</div>
           <button class="modal-close" id="closeModal">×</button>
         </div>
-        ${runs.length === 0 ? `<div class="text-sm text-muted">${t('common.empty')}</div>` : runs.map(run => `
+        ${
+          runs.length === 0
+            ? `<div class="text-sm text-muted">${t('common.empty')}</div>`
+            : runs
+                .map(
+                  (run) => `
           <div class="card mb-3">
             <div class="text-sm mb-2">${new Date(run.createdAt).toLocaleString()} · ${t('test.passed')}: ${run.passed} · ${t('test.failed')}: ${run.failed}</div>
-            ${run.results.map(r => `
+            ${run.results
+              .map(
+                (r) => `
               <div class="text-sm ${r.passed ? 'text-sage' : 'text-coral'}">
                 ${r.passed ? '✓' : '✗'} ${this.escapeHtml(r.output.slice(0, 100))}${r.output.length > 100 ? '...' : ''}
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
-        `).join('')}
+        `
+                )
+                .join('')
+        }
       </div>
     `;
     document.body.appendChild(overlay);

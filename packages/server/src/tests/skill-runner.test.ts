@@ -8,8 +8,8 @@ vi.mock('../db/index.js', () => ({
   saveDatabase: vi.fn(),
   default: {
     getDatabase: () => memoryDb,
-    saveDatabase: vi.fn()
-  }
+    saveDatabase: vi.fn(),
+  },
 }));
 
 describe('SkillRunner', () => {
@@ -23,18 +23,22 @@ describe('SkillRunner', () => {
     skillRunner.init();
 
     const skills = skillRunner.listSkills();
-    expect(skills.some(s => s.name === 'echo')).toBe(true);
-    expect(skills.some(s => s.name === 'time')).toBe(true);
+    expect(skills.some((s) => s.name === 'echo')).toBe(true);
+    expect(skills.some((s) => s.name === 'time')).toBe(true);
 
     const installed = skillRunner.listInstalled();
-    expect(installed.some(s => s.source === 'builtin')).toBe(true);
+    expect(installed.some((s) => s.source === 'builtin')).toBe(true);
   });
 
   it('executes built-in echo skill', async () => {
     const { skillRunner } = await import('../core/skill-runner.js');
     skillRunner.init();
 
-    const result = await skillRunner.executeSkill('builtin-echo', { message: 'hello' }, { conversationId: 'c1', agentId: 'a1', variables: {} });
+    const result = await skillRunner.executeSkill(
+      'builtin-echo',
+      { message: 'hello' },
+      { conversationId: 'c1', agentId: 'a1', variables: {} }
+    );
 
     expect(result.success).toBe(true);
     expect(result.output).toEqual({ echo: 'hello' });
@@ -44,7 +48,11 @@ describe('SkillRunner', () => {
     const { skillRunner } = await import('../core/skill-runner.js');
     skillRunner.init();
 
-    const result = await skillRunner.executeSkill('builtin-time', {}, { conversationId: 'c1', agentId: 'a1', variables: {} });
+    const result = await skillRunner.executeSkill(
+      'builtin-time',
+      {},
+      { conversationId: 'c1', agentId: 'a1', variables: {} }
+    );
 
     expect(result.success).toBe(true);
     expect(result.output).toHaveProperty('time');
@@ -55,7 +63,11 @@ describe('SkillRunner', () => {
     const { skillRunner } = await import('../core/skill-runner.js');
     skillRunner.init();
 
-    const result = await skillRunner.executeSkill('builtin-unknown', {}, { conversationId: 'c1', agentId: 'a1', variables: {} });
+    const result = await skillRunner.executeSkill(
+      'builtin-unknown',
+      {},
+      { conversationId: 'c1', agentId: 'a1', variables: {} }
+    );
 
     expect(result.success).toBe(false);
     expect(result.error).toContain('技能不存在');
@@ -65,7 +77,13 @@ describe('SkillRunner', () => {
     const { skillRunner } = await import('../core/skill-runner.js');
     const execute = async () => ({ ok: true });
 
-    skillRunner.registerSkill({ id: 'plugin-s1', name: 's1', description: '', parameters: {}, execute });
+    skillRunner.registerSkill({
+      id: 'plugin-s1',
+      name: 's1',
+      description: '',
+      parameters: {},
+      execute,
+    });
 
     const skill = skillRunner.getSkill('plugin-s1');
     expect(skill?.name).toBe('s1');
@@ -80,12 +98,16 @@ describe('SkillRunner', () => {
       name: 'double',
       description: 'double a number',
       code: 'return $args.value * 2;',
-      parameters: { type: 'object', properties: { value: { type: 'number' } } }
+      parameters: { type: 'object', properties: { value: { type: 'number' } } },
     });
 
     expect(installed.name).toBe('double');
 
-    const result = await skillRunner.executeSkill(installed.id, { value: 3 }, { conversationId: 'c1', agentId: 'a1', variables: {} });
+    const result = await skillRunner.executeSkill(
+      installed.id,
+      { value: 3 },
+      { conversationId: 'c1', agentId: 'a1', variables: {} }
+    );
     expect(result.success).toBe(true);
     expect(result.output).toEqual({ result: 6, logs: [] });
   });
@@ -94,11 +116,13 @@ describe('SkillRunner', () => {
     const { skillRunner } = await import('../core/skill-runner.js');
     skillRunner.init();
 
-    await expect(skillRunner.installSkill({
-      name: 'bad',
-      code: 'return {',
-      parameters: {}
-    })).rejects.toThrow('技能代码验证失败');
+    await expect(
+      skillRunner.installSkill({
+        name: 'bad',
+        code: 'return {',
+        parameters: {},
+      })
+    ).rejects.toThrow('技能代码验证失败');
   });
 
   it('uninstalls a user skill', async () => {
@@ -108,7 +132,7 @@ describe('SkillRunner', () => {
     const installed = await skillRunner.installSkill({
       name: 'temp',
       code: 'return 1;',
-      parameters: {}
+      parameters: {},
     });
 
     const ok = skillRunner.uninstallSkill(installed.id);
@@ -135,10 +159,14 @@ describe('SkillRunner', () => {
     const installed = await skillRunner.installSkill({
       name: 'logger',
       code: 'console.log("hi"); console.warn("warn"); console.error("err"); return 1;',
-      parameters: {}
+      parameters: {},
     });
 
-    const result = await skillRunner.executeSkill(installed.id, {}, { conversationId: 'c1', agentId: 'a1', variables: {} });
+    const result = await skillRunner.executeSkill(
+      installed.id,
+      {},
+      { conversationId: 'c1', agentId: 'a1', variables: {} }
+    );
     expect(result.success).toBe(true);
     expect(result.output.logs).toEqual(['hi', 'WARN: warn', 'ERROR: err']);
   });
@@ -150,10 +178,14 @@ describe('SkillRunner', () => {
     const installed = await skillRunner.installSkill({
       name: 'failer',
       code: 'throw new Error("oops");',
-      parameters: {}
+      parameters: {},
     });
 
-    const result = await skillRunner.executeSkill(installed.id, {}, { conversationId: 'c1', agentId: 'a1', variables: {} });
+    const result = await skillRunner.executeSkill(
+      installed.id,
+      {},
+      { conversationId: 'c1', agentId: 'a1', variables: {} }
+    );
     expect(result.success).toBe(false);
     expect(result.error).toContain('oops');
   });

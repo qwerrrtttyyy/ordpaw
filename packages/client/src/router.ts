@@ -1,6 +1,10 @@
 export class Router {
   private routes: Map<string, (params: Record<string, string>) => void> = new Map();
-  private paramRoutes: { pattern: string; keys: string[]; handler: (params: Record<string, string>) => void }[] = [];
+  private paramRoutes: {
+    pattern: string;
+    keys: string[];
+    handler: (params: Record<string, string>) => void;
+  }[] = [];
 
   on(path: string, handler: (params: Record<string, string>) => void) {
     if (path.includes(':')) {
@@ -32,7 +36,9 @@ export class Router {
       const match = hash.match(regex);
       if (match) {
         const params: Record<string, string> = {};
-        keys.forEach((key, i) => { params[key] = match[i + 1]; });
+        keys.forEach((key, i) => {
+          params[key] = match[i + 1];
+        });
         handler(params);
         return;
       }

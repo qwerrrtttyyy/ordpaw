@@ -2,6 +2,7 @@ import { API } from '../api';
 import { Store } from '../store';
 import { reloadPluginComponents } from '../component-loader';
 import { t } from '../i18n';
+import type { PluginInstance } from '@ordpaw/shared';
 
 export class PluginsView {
   private api: API;
@@ -40,7 +41,9 @@ export class PluginsView {
           </div>
         </div>
 
-        ${plugins.length === 0 ? `
+        ${
+          plugins.length === 0
+            ? `
           <div class="card">
             <div class="empty-state">
               <div class="empty-state-icon">◇</div>
@@ -48,28 +51,34 @@ export class PluginsView {
               <div class="text-sm text-muted">${t('plugin.emptyDesc') || '注册你的第一个插件扩展系统能力'}</div>
             </div>
           </div>
-        ` : `
+        `
+            : `
           <div class="grid grid-2">
-            ${plugins.map((p: any) => `
+            ${plugins
+              .map(
+                (p: PluginInstance) => `
               <div class="card">
                 <div class="flex items-start gap-3 mb-4">
                   <div class="list-item-icon sage" style="width: 44px; height: 44px;">◇</div>
                   <div style="flex: 1; min-width: 0;">
-                    <div class="list-item-title" style="font-size: 15px;">${p.name}</div>
-                    <div class="text-sm text-muted mt-1">${p.description || (t('plugin.noDesc') || '暂无描述')}</div>
+                    <div class="list-item-title" style="font-size: 15px;">${p.manifest.name}</div>
+                    <div class="text-sm text-muted mt-1">${p.manifest.description || t('plugin.noDesc') || '暂无描述'}</div>
                   </div>
                 </div>
                 <div class="flex gap-2 mb-4">
-                  <span class="badge badge-sage badge-dot">v${p.version}</span>
-                  <span class="badge ${p.enabled ? 'badge-accent' : ''} badge-dot">${p.enabled ? (t('plugin.enabled') || '已启用') : (t('plugin.disabled') || '已禁用')}</span>
+                  <span class="badge badge-sage badge-dot">v${p.manifest.version}</span>
+                  <span class="badge ${p.enabled ? 'badge-accent' : ''} badge-dot">${p.enabled ? t('plugin.enabled') || '已启用' : t('plugin.disabled') || '已禁用'}</span>
                 </div>
                 <div class="flex gap-2">
                   <button class="btn btn-ghost btn-sm delete-btn" data-id="${p.id}">${t('plugin.uninstall') || '卸载'}</button>
                 </div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
-        `}
+        `
+        }
       </div>
     `;
 
@@ -77,7 +86,7 @@ export class PluginsView {
       this.showInstallModal();
     });
 
-    content.querySelectorAll('.delete-btn').forEach(btn => {
+    content.querySelectorAll('.delete-btn').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
@@ -124,11 +133,14 @@ export class PluginsView {
     const close = () => overlay.remove();
     overlay.querySelector('#closeBtn')?.addEventListener('click', close);
     overlay.querySelector('#cancelBtn')?.addEventListener('click', close);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
 
     overlay.querySelector('#confirmBtn')?.addEventListener('click', async () => {
       const name = (overlay.querySelector('#pluginName') as HTMLInputElement)?.value;
-      const version = (overlay.querySelector('#pluginVersion') as HTMLInputElement)?.value || '0.0.1';
+      const version =
+        (overlay.querySelector('#pluginVersion') as HTMLInputElement)?.value || '0.0.1';
       const description = (overlay.querySelector('#pluginDesc') as HTMLTextAreaElement)?.value;
       if (!name) {
         alert(t('plugin.nameRequired') || '请填写插件名称');

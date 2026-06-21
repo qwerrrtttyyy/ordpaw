@@ -38,10 +38,10 @@ function createMemoryDb() {
   const mcpServers: McpServer[] = [];
 
   function exec(sql: string, params: any[] = []) {
-    const p = params.map(v => v ?? null);
+    const p = params.map((v) => v ?? null);
 
     if (sql.startsWith('SELECT * FROM mcp_servers WHERE id = ?')) {
-      const row = mcpServers.find(s => s.id === p[0]);
+      const row = mcpServers.find((s) => s.id === p[0]);
       if (!row) return [];
       return [rowToResult([row])];
     }
@@ -59,25 +59,31 @@ function createMemoryDb() {
   }
 
   function run(sql: string, params: any[] = []) {
-    const p = params.map(v => v ?? null);
+    const p = params.map((v) => v ?? null);
 
     if (sql.startsWith('INSERT INTO mcp_servers')) {
-      const [id, name, transport, command, url, envJson, enabled, connected, createdAt, updatedAt] = p;
-      const existing = mcpServers.find(s => s.id === id);
+      const [id, name, transport, command, url, envJson, enabled, connected, createdAt, updatedAt] =
+        p;
+      const existing = mcpServers.find((s) => s.id === id);
       if (existing) throw new Error(`Duplicate id ${id}`);
       mcpServers.push({
-        id, name, transport, command, url,
+        id,
+        name,
+        transport,
+        command,
+        url,
         env: safeJsonParse(envJson, {}),
         enabled: enabled === 1,
         connected: connected === 1,
-        createdAt, updatedAt,
+        createdAt,
+        updatedAt,
       } as McpServer);
       return;
     }
 
     if (sql.startsWith('UPDATE mcp_servers SET connected = 1')) {
       const [updatedAt, id] = p;
-      const row = mcpServers.find(s => s.id === id);
+      const row = mcpServers.find((s) => s.id === id);
       if (!row) throw new Error(`No row ${id}`);
       row.connected = true;
       row.updatedAt = updatedAt;
@@ -86,7 +92,7 @@ function createMemoryDb() {
 
     if (sql.startsWith('UPDATE mcp_servers SET connected = 0')) {
       const [updatedAt, id] = p;
-      const row = mcpServers.find(s => s.id === id);
+      const row = mcpServers.find((s) => s.id === id);
       if (!row) throw new Error(`No row ${id}`);
       row.connected = false;
       row.updatedAt = updatedAt;
@@ -95,7 +101,7 @@ function createMemoryDb() {
 
     if (sql.startsWith('DELETE FROM mcp_servers WHERE id = ?')) {
       const id = p[0];
-      const idx = mcpServers.findIndex(s => s.id === id);
+      const idx = mcpServers.findIndex((s) => s.id === id);
       if (idx !== -1) mcpServers.splice(idx, 1);
       return;
     }
@@ -111,8 +117,19 @@ function createMemoryDb() {
 }
 
 function rowToResult(rows: McpServer[]) {
-  const columns = ['id', 'name', 'transport', 'command', 'url', 'env_json', 'enabled', 'connected', 'created_at', 'updated_at'];
-  const values = rows.map(r => [
+  const columns = [
+    'id',
+    'name',
+    'transport',
+    'command',
+    'url',
+    'env_json',
+    'enabled',
+    'connected',
+    'created_at',
+    'updated_at',
+  ];
+  const values = rows.map((r) => [
     r.id,
     r.name,
     r.transport,
@@ -129,7 +146,11 @@ function rowToResult(rows: McpServer[]) {
 
 function safeJsonParse(val: any, def: any) {
   if (!val) return def;
-  try { return JSON.parse(val); } catch { return def; }
+  try {
+    return JSON.parse(val);
+  } catch {
+    return def;
+  }
 }
 
 vi.mock('../db/index.js', () => ({
@@ -172,14 +193,20 @@ describe('McpClient', () => {
     expect(memoryDb._rows[0].connected).toBe(true);
     expect(client.isConnected('math')).toBe(true);
     expect(mockConnect).toHaveBeenCalled();
-    expect(mockStdioTransport).toHaveBeenCalledWith({ command: 'node', args: ['math.js'], env: {} });
+    expect(mockStdioTransport).toHaveBeenCalledWith({
+      command: 'node',
+      args: ['math.js'],
+      env: {},
+    });
   });
 
   it('installServer throws when stdio command is missing', async () => {
     const mod = await import('../core/mcp-client.js');
     const client = mod.mcpClient;
 
-    await expect(client.installServer({ name: 'bad', transport: 'stdio' })).rejects.toThrow('stdio transport 需要提供 command');
+    await expect(client.installServer({ name: 'bad', transport: 'stdio' })).rejects.toThrow(
+      'stdio transport 需要提供 command'
+    );
   });
 
   it('connectServer uses SDK Client.connect and marks connected', async () => {
@@ -193,7 +220,9 @@ describe('McpClient', () => {
     const connected = await client.connectServer('test-uuid');
 
     expect(connected.connected).toBe(true);
-    expect(mockConnect).toHaveBeenCalledWith(expect.objectContaining({ command: 'node', args: ['math.js'] }));
+    expect(mockConnect).toHaveBeenCalledWith(
+      expect.objectContaining({ command: 'node', args: ['math.js'] })
+    );
   });
 
   it('disconnectServer closes client and marks disconnected', async () => {
@@ -252,7 +281,11 @@ describe('McpClient', () => {
     const mod = await import('../core/mcp-client.js');
     const client = mod.mcpClient;
 
-    const req: InstallMcpRequest = { name: 'remote', transport: 'sse', url: 'http://localhost:3000/sse' };
+    const req: InstallMcpRequest = {
+      name: 'remote',
+      transport: 'sse',
+      url: 'http://localhost:3000/sse',
+    };
     await client.installServer(req);
 
     expect(mockSseTransport).toHaveBeenCalledWith(new URL('http://localhost:3000/sse'));
@@ -263,7 +296,11 @@ describe('McpClient', () => {
     const mod = await import('../core/mcp-client.js');
     const client = mod.mcpClient;
 
-    const req: InstallMcpRequest = { name: 'remote', transport: 'websocket', url: 'ws://localhost:3000/ws' };
+    const req: InstallMcpRequest = {
+      name: 'remote',
+      transport: 'websocket',
+      url: 'ws://localhost:3000/ws',
+    };
     await client.installServer(req);
 
     expect(mockWebsocketTransport).toHaveBeenCalledWith(new URL('ws://localhost:3000/ws'));

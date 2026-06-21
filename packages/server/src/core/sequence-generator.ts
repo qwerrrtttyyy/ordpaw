@@ -137,14 +137,17 @@ export function validateSequence(
     // 选择器安全检查
     if (op.params?.selector) {
       for (const pattern of SANDBOX_CONFIG.blockedSelectors) {
-        if (pattern.test(op.params.selector)) {
+        if (pattern.test(String(op.params.selector))) {
           errors.push(`操作 ${op.id} 使用了禁止的选择器: ${op.params.selector}`);
         }
       }
     }
 
     // 路由安全检查
-    if (op.type === 'ui:navigate' && !SANDBOX_CONFIG.allowedRoutes.includes(op.params?.route)) {
+    if (
+      op.type === 'ui:navigate' &&
+      !SANDBOX_CONFIG.allowedRoutes.includes(String(op.params?.route || ''))
+    ) {
       errors.push(`操作 ${op.id} 导航到未授权的路由: ${op.params?.route}`);
     }
   }

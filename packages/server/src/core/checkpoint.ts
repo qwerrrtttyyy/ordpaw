@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Checkpoint, Message } from '@ordpaw/shared';
+import type { BindParams } from 'sql.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { eventBus } from './event-bus.js';
 import { queryAll, queryOne, safeJsonParse } from '../db/utils.js';
@@ -31,7 +32,11 @@ export class CheckpointManager {
   createCheckpoint(conversationId: string, messageId: string, label?: string): Checkpoint | null {
     try {
       const db = getDatabase();
-      const conversation = queryOne<ConversationRow>(db, 'SELECT * FROM conversations WHERE id = ?', [conversationId]);
+      const conversation = queryOne<ConversationRow>(
+        db,
+        'SELECT * FROM conversations WHERE id = ?',
+        [conversationId]
+      );
       if (!conversation) return null;
 
       // Snapshot current messages + variables for time-travel rollback.
@@ -42,14 +47,14 @@ export class CheckpointManager {
       );
 
       const state = {
-        messages: messages.map(m => ({
+        messages: messages.map((m) => ({
           id: m.id,
           role: m.role,
           content: m.content,
           timestamp: m.timestamp,
-          metadata: safeJsonParse<Record<string, unknown>>(m.metadata_json, {})
+          metadata: safeJsonParse<Record<string, unknown>>(m.metadata_json, {}),
         })),
-        variables: safeJsonParse<Record<string, unknown>>(conversation.variables_json, {})
+        variables: safeJsonParse<Record<string, unknown>>(conversation.variables_json, {}),
       };
 
       const checkpoint: Checkpoint = {
@@ -58,20 +63,23 @@ export class CheckpointManager {
         messageId,
         state,
         label: label || undefined,
-        createdAt: Date.now()
+        createdAt: Date.now(),
       };
 
-      db.run(`
+      db.run(
+        `
         INSERT INTO checkpoints (id, conversation_id, message_id, state_json, label, created_at)
         VALUES (?, ?, ?, ?, ?, ?)
-      `, [
-        checkpoint.id,
-        checkpoint.conversationId,
-        checkpoint.messageId,
-        JSON.stringify(checkpoint.state),
-        checkpoint.label || null,
-        checkpoint.createdAt
-      ]);
+      `,
+        [
+          checkpoint.id,
+          checkpoint.conversationId,
+          checkpoint.messageId,
+          JSON.stringify(checkpoint.state),
+          checkpoint.label || null,
+          checkpoint.createdAt,
+        ]
+      );
 
       saveDatabase();
       eventBus.emit('checkpoint:created', checkpoint);
@@ -92,13 +100,16 @@ export class CheckpointManager {
         [conversationId]
       );
 
-      return rows.map(cp => ({
+      return rows.map((cp) => ({
         id: cp.id,
         conversationId: cp.conversation_id,
         messageId: cp.message_id,
-        state: safeJsonParse<{ messages: Message[]; variables: Record<string, unknown> }>(cp.state_json, { messages: [], variables: {} }),
+        state: safeJsonParse<{ messages: Message[]; variables: Record<string, unknown> }>(
+          cp.state_json,
+          { messages: [], variables: {} }
+        ),
         label: cp.label || undefined,
-        createdAt: cp.created_at
+        createdAt: cp.created_at,
       }));
     } catch (err) {
       logger.error(err, 'getCheckpoints 错误:');
@@ -130,10 +141,10 @@ export class CheckpointManager {
 
       if (!checkpoint) return false;
 
-      const state = safeJsonParse<{ messages: Array<Record<string, unknown>>; variables: Record<string, unknown> }>(
-        checkpoint.state_json,
-        { messages: [], variables: {} }
-      );
+      const state = safeJsonParse<{
+        messages: Array<Record<string, unknown>>;
+        variables: Record<string, unknown>;
+      }>(checkpoint.state_json, { messages: [], variables: {} });
 
       // Drop all current messages — we will restore from snapshot.
       db.run('DELETE FROM messages WHERE conversation_id = ?', [conversationId]);
@@ -146,30 +157,31 @@ export class CheckpointManager {
       try {
         for (const m of state.messages || []) {
           stmt.run([
-            m.id,
+            m.id as string,
             conversationId,
-            m.role,
-            m.content ?? '',
-            m.timestamp ?? Date.now(),
-            JSON.stringify(m.metadata ?? {})
-          ]);
+            m.role as string,
+            (m.content as string) ?? '',
+            (m.timestamp as number) ?? Date.now(),
+            JSON.stringify(m.metadata ?? {}),
+          ] as BindParams);
         }
       } finally {
         stmt.free();
       }
 
       // Restore variables.
-      db.run(
-        'UPDATE conversations SET variables_json = ?, updated_at = ? WHERE id = ?',
-        [JSON.stringify(state.variables || {}), Date.now(), conversationId]
-      );
+      db.run('UPDATE conversations SET variables_json = ?, updated_at = ? WHERE id = ?', [
+        JSON.stringify(state.variables || {}),
+        Date.now(),
+        conversationId,
+      ]);
 
       // Delete any checkpoints created strictly after the target one —
       // they represent a "future" that no longer exists.
-      db.run(
-        'DELETE FROM checkpoints WHERE conversation_id = ? AND created_at > ?',
-        [conversationId, checkpoint.created_at]
-      );
+      db.run('DELETE FROM checkpoints WHERE conversation_id = ? AND created_at > ?', [
+        conversationId,
+        checkpoint.created_at,
+      ]);
 
       saveDatabase();
       eventBus.emit('checkpoint:rollback', { conversationId, checkpointId });

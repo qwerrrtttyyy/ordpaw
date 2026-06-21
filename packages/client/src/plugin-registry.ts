@@ -1,11 +1,17 @@
 import { logger } from './logger';
 
 const eventHandlers: Record<string, Array<(payload: unknown) => void>> = {};
-const actionHandlers: Record<string, (params: Record<string, unknown>, context: unknown) => unknown> = {};
+const actionHandlers: Record<
+  string,
+  (params: Record<string, unknown>, context: unknown) => unknown
+> = {};
 let settingsGetter: (() => Record<string, unknown>) | null = null;
 
 const apiObject = {
-  registerActionHandler(type: string, handler: (params: Record<string, unknown>, context: unknown) => unknown) {
+  registerActionHandler(
+    type: string,
+    handler: (params: Record<string, unknown>, context: unknown) => unknown
+  ) {
     actionHandlers[type] = handler;
   },
   unregisterActionHandler(type: string) {
@@ -15,7 +21,11 @@ const apiObject = {
     const handlers = eventHandlers[event];
     if (handlers) {
       for (const h of handlers) {
-        try { h(payload); } catch (e) { logger.error(e, '[PluginRegistry] event handler error'); }
+        try {
+          h(payload);
+        } catch (e) {
+          logger.error(e, '[PluginRegistry] event handler error');
+        }
       }
     }
   },
@@ -49,7 +59,8 @@ type GlobalWithOrdPaw = typeof globalThis & Record<string, unknown>;
 export function installGlobalPluginApi(settingsGetter: () => Record<string, unknown>) {
   pluginRegistry.setSettingsGetter(settingsGetter);
   const api = pluginRegistry.api();
-  const ns = ((globalThis as GlobalWithOrdPaw).__ordpaw as Record<string, unknown> | undefined) || {};
+  const ns =
+    ((globalThis as GlobalWithOrdPaw).__ordpaw as Record<string, unknown> | undefined) || {};
   ns.OrdPaw = api;
   (globalThis as GlobalWithOrdPaw).__ordpaw = ns;
   // 保留旧版别名，让已部署的插件脚本无需改动即可运行。

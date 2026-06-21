@@ -4,13 +4,13 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 global.document = {
   createElement: vi.fn(() => ({
     textContent: '',
-    innerHTML: ''
-  }))
+    innerHTML: '',
+  })),
 } as any;
 
 global.fetch = vi.fn();
 global.window = {
-  matchMedia: vi.fn(() => ({ matches: false, addEventListener: vi.fn() }))
+  matchMedia: vi.fn(() => ({ matches: false, addEventListener: vi.fn() })),
 } as any;
 
 function makeResponse<T>(data: T, ok = true, status = 200): any {
@@ -18,9 +18,9 @@ function makeResponse<T>(data: T, ok = true, status = 200): any {
     ok,
     status,
     statusText: ok ? 'OK' : 'Error',
-    headers: { get: (h: string) => h === 'content-type' ? 'application/json' : '' },
+    headers: { get: (h: string) => (h === 'content-type' ? 'application/json' : '') },
     json: async () => data,
-    text: async () => JSON.stringify(data)
+    text: async () => JSON.stringify(data),
   };
 }
 
@@ -63,9 +63,11 @@ describe('API Cache', () => {
     const api = new API();
 
     let resolveFn: (value: any) => void;
-    (global.fetch as any).mockReturnValue(new Promise((resolve) => {
-      resolveFn = resolve;
-    }));
+    (global.fetch as any).mockReturnValue(
+      new Promise((resolve) => {
+        resolveFn = resolve;
+      })
+    );
 
     const p1 = api.getAgents();
     const p2 = api.getAgents();
@@ -130,9 +132,7 @@ describe('Error Handling', () => {
     const { API } = await import('../api');
     const api = new API();
 
-    (global.fetch as any).mockResolvedValue(
-      makeResponse({ error: 'Not found' }, false, 404)
-    );
+    (global.fetch as any).mockResolvedValue(makeResponse({ error: 'Not found' }, false, 404));
 
     try {
       await api.getAgent('invalid');
@@ -171,7 +171,7 @@ describe('Error Handling', () => {
       statusText: 'OK',
       headers: { get: () => 'text/plain' },
       json: async () => ({}),
-      text: async () => 'plain text'
+      text: async () => 'plain text',
     });
 
     const result = await api.getStats();
@@ -188,7 +188,7 @@ describe('Error Handling', () => {
       statusText: 'Server Error',
       headers: { get: () => 'text/plain' },
       json: async () => ({}),
-      text: async () => 'server exploded'
+      text: async () => 'server exploded',
     });
 
     await expect(api.getAgents()).rejects.toThrow('server exploded');
@@ -204,9 +204,18 @@ describe('Error Handling', () => {
     await api.updateAgent('a1', { name: 'Updated' });
     await api.deleteAgent('a1');
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/agents', expect.objectContaining({ method: 'POST' }));
-    expect(global.fetch).toHaveBeenCalledWith('/api/agents/a1', expect.objectContaining({ method: 'PUT' }));
-    expect(global.fetch).toHaveBeenCalledWith('/api/agents/a1', expect.objectContaining({ method: 'DELETE' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/agents',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/agents/a1',
+      expect.objectContaining({ method: 'PUT' })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/agents/a1',
+      expect.objectContaining({ method: 'DELETE' })
+    );
   });
 
   it('should call conversation endpoints', async () => {
@@ -220,7 +229,10 @@ describe('Error Handling', () => {
     await api.deleteConversation('c1');
     await api.sendMessage('c1', 'hello');
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/conversations', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/conversations',
+      expect.objectContaining({ method: 'POST' })
+    );
     expect(global.fetch).toHaveBeenCalledWith('/api/conversations/c1', expect.anything());
   });
 
@@ -250,7 +262,10 @@ describe('Error Handling', () => {
     await api.getStats();
 
     expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.anything());
-    expect(global.fetch).toHaveBeenCalledWith('/api/settings', expect.objectContaining({ method: 'PUT' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/settings',
+      expect.objectContaining({ method: 'PUT' })
+    );
     expect(global.fetch).toHaveBeenCalledWith('/api/stats', expect.anything());
   });
 
@@ -266,7 +281,10 @@ describe('Error Handling', () => {
     await api.uninstallSkill('s1');
 
     expect(global.fetch).toHaveBeenCalledWith('/api/skills', expect.anything());
-    expect(global.fetch).toHaveBeenCalledWith('/api/skills/install', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/skills/install',
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 
   it('should call component endpoints', async () => {
@@ -297,7 +315,10 @@ describe('Error Handling', () => {
     await api.importData({ version: 1 });
 
     expect(global.fetch).toHaveBeenCalledWith('/api/export?scope=agents', expect.anything());
-    expect(global.fetch).toHaveBeenCalledWith('/api/import', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/import',
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 
   it('should call clear-data and reset endpoints', async () => {
@@ -309,7 +330,13 @@ describe('Error Handling', () => {
     await api.clearData(['conversations']);
     await api.resetSettings();
 
-    expect(global.fetch).toHaveBeenCalledWith('/api/clear-data', expect.objectContaining({ method: 'POST' }));
-    expect(global.fetch).toHaveBeenCalledWith('/api/reset/settings', expect.objectContaining({ method: 'POST' }));
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/clear-data',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(global.fetch).toHaveBeenCalledWith(
+      '/api/reset/settings',
+      expect.objectContaining({ method: 'POST' })
+    );
   });
 });

@@ -4,8 +4,11 @@ const DEFAULT_LEVEL: LogLevel = 'info';
 
 function detectLevel(): LogLevel {
   try {
-    const envLevel = (import.meta as unknown as { env?: Record<string, string> }).env?.['VITE_LOG_LEVEL'];
-    const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('ordpaw:logLevel') : null;
+    const envLevel = (import.meta as unknown as { env?: Record<string, string> }).env?.[
+      'VITE_LOG_LEVEL'
+    ];
+    const stored =
+      typeof localStorage !== 'undefined' ? localStorage.getItem('ordpaw:logLevel') : null;
     const level = envLevel || stored;
     if (level && ['debug', 'info', 'warn', 'error'].includes(level)) return level as LogLevel;
   } catch {

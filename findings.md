@@ -38,21 +38,21 @@
 
 ### Phase 2 未测试导出清单（server 核心模块）
 
-| 文件 | 导出符号 | 类型 | 备注 |
-|------|----------|------|------|
-| `packages/server/src/db/utils.ts` | `safeJsonParse` | function | JSON 安全解析，含回退 |
-| `packages/server/src/db/utils.ts` | `rowToObject` | function | sql.js 行 → 对象 |
-| `packages/server/src/db/utils.ts` | `queryAll` | function | SELECT 全部 |
-| `packages/server/src/db/utils.ts` | `queryOne` | function | SELECT 单条 |
-| `packages/server/src/db/utils.ts` | `safeCount` | function | COUNT 安全读取 |
-| `packages/server/src/core/event-bus.ts` | `eventBus` | singleton | EventBusImpl（on/off/emit） |
-| `packages/server/src/core/session.ts` | `SessionManager` | class | 会话 CRUD |
-| `packages/server/src/core/session.ts` | `sessionManager` | singleton | 默认实例 |
-| `packages/server/src/core/skill-runner.ts` | `SkillRunner` | class | 技能注册/安装/执行/卸载 |
-| `packages/server/src/core/skill-runner.ts` | `skillRunner` | singleton | 默认实例 |
-| `packages/server/src/core/provider-service.ts` | `ProviderService` | class | 服务商 CRUD + 内置服务商 |
-| `packages/server/src/core/provider-service.ts` | `providerService` | singleton | 默认实例 |
-| `packages/server/src/api/index.ts` | `setupApiRoutes` | function | Express API 路由装配 |
+| 文件                                           | 导出符号          | 类型      | 备注                        |
+| ---------------------------------------------- | ----------------- | --------- | --------------------------- |
+| `packages/server/src/db/utils.ts`              | `safeJsonParse`   | function  | JSON 安全解析，含回退       |
+| `packages/server/src/db/utils.ts`              | `rowToObject`     | function  | sql.js 行 → 对象            |
+| `packages/server/src/db/utils.ts`              | `queryAll`        | function  | SELECT 全部                 |
+| `packages/server/src/db/utils.ts`              | `queryOne`        | function  | SELECT 单条                 |
+| `packages/server/src/db/utils.ts`              | `safeCount`       | function  | COUNT 安全读取              |
+| `packages/server/src/core/event-bus.ts`        | `eventBus`        | singleton | EventBusImpl（on/off/emit） |
+| `packages/server/src/core/session.ts`          | `SessionManager`  | class     | 会话 CRUD                   |
+| `packages/server/src/core/session.ts`          | `sessionManager`  | singleton | 默认实例                    |
+| `packages/server/src/core/skill-runner.ts`     | `SkillRunner`     | class     | 技能注册/安装/执行/卸载     |
+| `packages/server/src/core/skill-runner.ts`     | `skillRunner`     | singleton | 默认实例                    |
+| `packages/server/src/core/provider-service.ts` | `ProviderService` | class     | 服务商 CRUD + 内置服务商    |
+| `packages/server/src/core/provider-service.ts` | `providerService` | singleton | 默认实例                    |
+| `packages/server/src/api/index.ts`             | `setupApiRoutes`  | function  | Express API 路由装配        |
 
 ### Phase 2 发现的阻塞/质量问题
 
@@ -68,10 +68,10 @@
 
 ## Phase 2 覆盖率最终数据
 
-| 包 | Lines | Branch | Functions | Statements |
-|----|-------|--------|-----------|------------|
-| `@ordpaw/server` | 86.73% | 71.42% | 95.58% | 86.73% |
-| `@ordpaw/client` | 95.32% | 73.60% | 94.87% | 95.32% |
+| 包               | Lines  | Branch | Functions | Statements |
+| ---------------- | ------ | ------ | --------- | ---------- |
+| `@ordpaw/server` | 86.73% | 71.42% | 95.58%    | 86.73%     |
+| `@ordpaw/client` | 95.32% | 73.60% | 94.87%    | 95.32%     |
 
 `pnpm test` 与 `pnpm test:coverage` 均已通过。
 

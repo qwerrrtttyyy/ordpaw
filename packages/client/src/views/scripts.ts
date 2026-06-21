@@ -38,33 +38,39 @@ export class ScriptsView {
         </div>
       </div>
 
-      ${scripts.length === 0 ? `
+      ${
+        scripts.length === 0
+          ? `
         <div class="empty-state">
           <div class="empty-state-icon">▣</div>
           <div class="empty-state-title">${t('common.empty')}</div>
           <div class="text-sm text-muted">${t('script.create')}</div>
         </div>
-      ` : `
+      `
+          : `
         <div class="grid grid-2" id="scripts-list">
-          ${scripts.map(s => this.renderScriptCard(s)).join('')}
+          ${scripts.map((s) => this.renderScriptCard(s)).join('')}
         </div>
-      `}
+      `
+      }
     `;
 
-    document.getElementById('createScriptBtn')?.addEventListener('click', () => this.showCreateModal());
-    content.querySelectorAll('.script-edit').forEach(btn => {
+    document
+      .getElementById('createScriptBtn')
+      ?.addEventListener('click', () => this.showCreateModal());
+    content.querySelectorAll('.script-edit').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.showEditModal(id);
       });
     });
-    content.querySelectorAll('.script-delete').forEach(btn => {
+    content.querySelectorAll('.script-delete').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id && confirm(t('script.deleteConfirm'))) this.deleteScript(id);
       });
     });
-    content.querySelectorAll('.script-run').forEach(btn => {
+    content.querySelectorAll('.script-run').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.runScript(id);
@@ -148,7 +154,8 @@ export class ScriptsView {
     document.getElementById('saveScript')?.addEventListener('click', async () => {
       const name = (document.getElementById('scriptName') as HTMLInputElement).value;
       const description = (document.getElementById('scriptDesc') as HTMLInputElement).value;
-      const language = (document.getElementById('scriptLang') as HTMLSelectElement).value as any;
+      const language = (document.getElementById('scriptLang') as HTMLSelectElement)
+        .value as Script['language'];
       const code = (document.getElementById('scriptCode') as HTMLTextAreaElement).value;
 
       try {
@@ -159,8 +166,8 @@ export class ScriptsView {
         }
         close();
         await this.render();
-      } catch (err: any) {
-        alert(err.message || '保存失败');
+      } catch (err: unknown) {
+        alert(err instanceof Error ? err.message : '保存失败');
       }
     });
   }
@@ -192,7 +199,7 @@ export class ScriptsView {
         </div>
         ${result.error ? `<pre class="code-body" style="background:var(--ord-rose-soft);color:var(--ord-rose)"><code>${this.escapeHtml(result.error)}</code></pre>` : ''}
         ${result.output !== undefined ? `<pre class="code-body"><code>${this.escapeHtml(typeof result.output === 'string' ? result.output : JSON.stringify(result.output, null, 2))}</code></pre>` : ''}
-        ${result.logs.length > 0 ? `<div class="text-xs text-muted mt-2">${result.logs.map(l => `<div>${this.escapeHtml(l)}</div>`).join('')}</div>` : ''}
+        ${result.logs.length > 0 ? `<div class="text-xs text-muted mt-2">${result.logs.map((l) => `<div>${this.escapeHtml(l)}</div>`).join('')}</div>` : ''}
       </div>
     `;
   }

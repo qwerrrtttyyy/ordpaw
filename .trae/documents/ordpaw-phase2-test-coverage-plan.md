@@ -33,33 +33,33 @@
 
 ### 2.3 覆盖率基线（server，基于已生成的 `packages/server/coverage/coverage-summary.json`）
 
-| 指标 | 覆盖率 |
-|------|--------|
-| lines | 48.26% |
+| 指标       | 覆盖率 |
+| ---------- | ------ |
+| lines      | 48.26% |
 | statements | 48.26% |
-| functions | 59.13% |
-| branches | 70.46% |
+| functions  | 59.13% |
+| branches   | 70.46% |
 
 覆盖率显著低于 80% 的文件（按未覆盖行数降序）：
 
-| 文件 | 当前行覆盖 | 未覆盖行数 | 备注 |
-|------|-----------|-----------|------|
-| `packages/server/src/api/index.ts` | 46.52% | ~408 | API 路由装配 |
-| `packages/server/src/core/test-suite.ts` | 21.11% | ~284 | 测试套件 CRUD + run |
-| `packages/server/src/db/index.ts` | 18.67% | ~257 | 数据库初始化/保存 |
-| `packages/server/src/core/download-service.ts` | 19.76% | ~276 | 下载路由 + 后台任务 |
-| `packages/server/src/core/script-mcp.ts` | 47.29% | ~214 | 脚本/MCP 执行 |
-| `packages/server/src/core/agent-runtime.ts` | 47.88% | ~185 | Agent 运行时 |
-| `packages/server/src/core/sequence-generator.ts` | 0% | 233 | 操作序列生成 |
-| `packages/server/src/ws/handler.ts` | 0% | 168 | WebSocket 消息处理 |
-| `packages/server/src/index.ts` | 0% | 168 | 服务启动入口 |
-| `packages/server/src/middleware.ts` | 69.85% | ~41 | 错误/日志/验证中间件 |
-| `packages/server/src/core/checkpoint.ts` | 61.41% | ~71 | 检查点管理 |
-| `packages/server/src/core/component-server.ts` | 69.42% | ~85 | 组件服务 |
-| `packages/server/src/core/cache.ts` | 78.84% | ~11 | 缓存 |
-| `packages/server/src/core/debug-logger.ts` | 73.62% | ~24 | 调试日志 |
-| `packages/server/src/core/logger.ts` | 57.89% | ~8 | 日志入口 |
-| `packages/server/src/plugin/loader.ts` | 58.08% | ~57 | 插件加载 |
+| 文件                                             | 当前行覆盖 | 未覆盖行数 | 备注                 |
+| ------------------------------------------------ | ---------- | ---------- | -------------------- |
+| `packages/server/src/api/index.ts`               | 46.52%     | ~408       | API 路由装配         |
+| `packages/server/src/core/test-suite.ts`         | 21.11%     | ~284       | 测试套件 CRUD + run  |
+| `packages/server/src/db/index.ts`                | 18.67%     | ~257       | 数据库初始化/保存    |
+| `packages/server/src/core/download-service.ts`   | 19.76%     | ~276       | 下载路由 + 后台任务  |
+| `packages/server/src/core/script-mcp.ts`         | 47.29%     | ~214       | 脚本/MCP 执行        |
+| `packages/server/src/core/agent-runtime.ts`      | 47.88%     | ~185       | Agent 运行时         |
+| `packages/server/src/core/sequence-generator.ts` | 0%         | 233        | 操作序列生成         |
+| `packages/server/src/ws/handler.ts`              | 0%         | 168        | WebSocket 消息处理   |
+| `packages/server/src/index.ts`                   | 0%         | 168        | 服务启动入口         |
+| `packages/server/src/middleware.ts`              | 69.85%     | ~41        | 错误/日志/验证中间件 |
+| `packages/server/src/core/checkpoint.ts`         | 61.41%     | ~71        | 检查点管理           |
+| `packages/server/src/core/component-server.ts`   | 69.42%     | ~85        | 组件服务             |
+| `packages/server/src/core/cache.ts`              | 78.84%     | ~11        | 缓存                 |
+| `packages/server/src/core/debug-logger.ts`       | 73.62%     | ~24        | 调试日志             |
+| `packages/server/src/core/logger.ts`             | 57.89%     | ~8         | 日志入口             |
+| `packages/server/src/plugin/loader.ts`           | 58.08%     | ~57        | 插件加载             |
 
 ### 2.4 覆盖率基线（client）
 

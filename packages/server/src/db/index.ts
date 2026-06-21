@@ -312,5 +312,5 @@ export default {
   initDatabase,
   saveDatabase,
   flushDatabaseSync,
-  getDatabase
+  getDatabase,
 };

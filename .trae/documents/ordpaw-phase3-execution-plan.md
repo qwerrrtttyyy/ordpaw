@@ -3,6 +3,7 @@
 ## 1. 任务摘要
 
 完成 OrdPaw v0.0.3 Phase 3 代码质量重构：
+
 - 结构化日志（server 已引入 pino，client 已封装 logger）保持并验证。
 - 统一错误类（`OrdPawError` / `OrdPawErrorCode`）并让 client API 错误继承之。
 - 消除 `packages/server/src/**/*.ts`、`packages/client/src/**/*.ts`、`packages/shared/src/errors.ts` 核心模块中的 `any` 类型。
@@ -14,19 +15,19 @@
 
 ## 2. 当前状态分析（基于 Phase 1 探索）
 
-| 区域 | 当前状态 |
-|------|----------|
-| `packages/server/src/core/logger.ts` | 已创建，使用 pino，级别读取 `LOG_LEVEL`，dev 用 pino-pretty，prod 输出 JSON。 |
-| `packages/server/package.json` | 已安装 `pino` / `pino-pretty`。 |
-| `packages/server/src/middleware.ts` | `ApiError` 已继承 `OrdPawError`，`logger` 已接入错误/请求日志。 |
-| `packages/server/src/core/component-server.ts` / `mcp-client.ts` / `api/index.ts` | 已基本无 `any`（非测试代码），`console` 已替换为 `logger`。 |
-| `packages/shared/src/errors.ts` | 已定义 `OrdPawError`、`OrdPawErrorCode`、`OrdPawErrorOptions`。 |
-| `packages/client/src/logger.ts` | 已创建轻量封装，保留 `console.debug/warn/error` 作为底层输出。 |
-| `packages/client/src/api.ts` | 仍有大量 `any`：`APICache`、`pendingRequests`、`request<T=any>`、`sendMessage`、`installPlugin`、`getStats`、`getSkills`、`getComponentTree` 等；`OrdPawApiError` 尚未继承 `OrdPawError`。 |
-| `packages/client/src/views/*.ts` | 多处回调参数/局部变量/异常类型使用 `any`。 |
-| `packages/client/src/utils.ts` | `debounce`/`throttle` 约束使用 `any[]`；`detectOS` 使用 `(navigator as any).maxTouchPoints`。 |
-| `packages/client/src/views/component-tree.ts` | `TreeNodeData.metadata`、`createTreeVisualization` 参数、`lastRoot` 使用 `any`。 |
-| `TODO/FIXME/XXX` | 当前 `packages/*/src/**/*.ts` 中未命中（已有注释为说明性，非 TODO）。 |
+| 区域                                                                              | 当前状态                                                                                                                                                                                   |
+| --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/server/src/core/logger.ts`                                              | 已创建，使用 pino，级别读取 `LOG_LEVEL`，dev 用 pino-pretty，prod 输出 JSON。                                                                                                              |
+| `packages/server/package.json`                                                    | 已安装 `pino` / `pino-pretty`。                                                                                                                                                            |
+| `packages/server/src/middleware.ts`                                               | `ApiError` 已继承 `OrdPawError`，`logger` 已接入错误/请求日志。                                                                                                                            |
+| `packages/server/src/core/component-server.ts` / `mcp-client.ts` / `api/index.ts` | 已基本无 `any`（非测试代码），`console` 已替换为 `logger`。                                                                                                                                |
+| `packages/shared/src/errors.ts`                                                   | 已定义 `OrdPawError`、`OrdPawErrorCode`、`OrdPawErrorOptions`。                                                                                                                            |
+| `packages/client/src/logger.ts`                                                   | 已创建轻量封装，保留 `console.debug/warn/error` 作为底层输出。                                                                                                                             |
+| `packages/client/src/api.ts`                                                      | 仍有大量 `any`：`APICache`、`pendingRequests`、`request<T=any>`、`sendMessage`、`installPlugin`、`getStats`、`getSkills`、`getComponentTree` 等；`OrdPawApiError` 尚未继承 `OrdPawError`。 |
+| `packages/client/src/views/*.ts`                                                  | 多处回调参数/局部变量/异常类型使用 `any`。                                                                                                                                                 |
+| `packages/client/src/utils.ts`                                                    | `debounce`/`throttle` 约束使用 `any[]`；`detectOS` 使用 `(navigator as any).maxTouchPoints`。                                                                                              |
+| `packages/client/src/views/component-tree.ts`                                     | `TreeNodeData.metadata`、`createTreeVisualization` 参数、`lastRoot` 使用 `any`。                                                                                                           |
+| `TODO/FIXME/XXX`                                                                  | 当前 `packages/*/src/**/*.ts` 中未命中（已有注释为说明性，非 TODO）。                                                                                                                      |
 
 ---
 
@@ -44,7 +45,7 @@
 **文件**: `packages/client/src/api.ts`
 
 1. **导入** `OrdPawError` from `@ordpaw/shared/errors`，并额外导入需要的类型：`StatsResponse`、`ComponentTreeResponse`、`ComponentPluginsResponse`、`SkillDefinition`。
-2. **`OrdPawApiError`**: 
+2. **`OrdPawApiError`**:
    - 改为 `export class OrdPawApiError extends OrdPawError`。
    - 保留构造函数签名 `(message: string, status: number, code?: ErrorCode, details?: unknown)`。
    - 保留 `status`、`code`、`details` 字段语义；`code` 继续使用小写 `ErrorCode` 以兼容现有测试与运行时。
@@ -85,9 +86,17 @@
 
 - 新增本地类型：
   ```ts
-  interface StreamChunkPayload { messageId: string; chunk: string; }
-  interface StreamDonePayload { messageId: string; }
-  interface StreamErrorPayload { messageId: string; error?: string; }
+  interface StreamChunkPayload {
+    messageId: string;
+    chunk: string;
+  }
+  interface StreamDonePayload {
+    messageId: string;
+  }
+  interface StreamErrorPayload {
+    messageId: string;
+    error?: string;
+  }
   ```
 - `handleStreamChunk(payload: any)` 等三个方法改为对应具体类型。
 - `(this.shell as any)._wsCleanup`：在类中新增 `private wsCleanup?: () => void;`，赋值 `this.wsCleanup = () => ws.removeEventListener(...)`；`destroy()` 调用 `this.wsCleanup?.()`。移除 `as any`。
@@ -116,7 +125,7 @@
 
 **文件**: `packages/client/src/views/settings.ts`
 
-- `t(\`theme.\${theme}\` as any)` → `t(\`theme.\${theme}\` as \`theme.\${ThemeId}\`)`；若类型仍不兼容则退回到 `as string`。
+- `t(\`theme.\${theme}\` as any)`→`t(\`theme.\${theme}\` as \`theme.\${ThemeId}\`)`；若类型仍不兼容则退回到 `as string`。
 - `value as any` for `logLevel` / `checkpointStrategy` → `as Settings['logLevel']` / `as Settings['checkpointStrategy']`。
 
 **文件**: `packages/client/src/views/providers.ts`

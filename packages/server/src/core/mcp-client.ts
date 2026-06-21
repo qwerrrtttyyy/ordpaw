@@ -1,5 +1,5 @@
 import type { McpServer, McpConfig, InstallMcpRequest } from '@ordpaw/shared';
-import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors';
 import { v4 as uuidv4 } from 'uuid';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { Client } from '@modelcontextprotocol/sdk/client';

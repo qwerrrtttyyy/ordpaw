@@ -31,10 +31,13 @@ export class SessionManager {
     const id = uuidv4();
     const safeTitle = (title || '新会话').toString();
 
-    db.run(`
+    db.run(
+      `
       INSERT INTO conversations (id, agent_id, title, variables_json, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [id, agentId, safeTitle, '{}', now, now]);
+    `,
+      [id, agentId, safeTitle, '{}', now, now]
+    );
 
     saveDatabase();
     eventBus.emit('conversation:created', { id, agentId });
@@ -52,12 +55,12 @@ export class SessionManager {
         'SELECT * FROM messages WHERE conversation_id = ? ORDER BY "timestamp" ASC, id ASC',
         [id]
       );
-      const messages: Message[] = msgRows.map(msg => ({
+      const messages: Message[] = msgRows.map((msg) => ({
         id: msg.id,
         role: msg.role,
         content: msg.content,
         timestamp: msg.timestamp,
-        metadata: safeJsonParse<Record<string, unknown>>(msg.metadata_json, {})
+        metadata: safeJsonParse<Record<string, unknown>>(msg.metadata_json, {}),
       }));
 
       const checkpoints = checkpointManager.getCheckpoints(id);
@@ -70,7 +73,7 @@ export class SessionManager {
         checkpoints,
         variables: safeJsonParse<Record<string, unknown>>(conv.variables_json, {}),
         createdAt: conv.created_at,
-        updatedAt: conv.updated_at
+        updatedAt: conv.updated_at,
       };
     } catch (err) {
       logger.error(err, 'getConversation 错误:');
@@ -82,9 +85,13 @@ export class SessionManager {
     try {
       const db = getDatabase();
       const rows = agentId
-        ? queryAll<ConversationRow>(db, 'SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC', [agentId])
+        ? queryAll<ConversationRow>(
+            db,
+            'SELECT * FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC',
+            [agentId]
+          )
         : queryAll<ConversationRow>(db, 'SELECT * FROM conversations ORDER BY updated_at DESC');
-      return rows.map(conv => ({
+      return rows.map((conv) => ({
         id: conv.id,
         agentId: conv.agent_id,
         title: conv.title,
@@ -92,7 +99,7 @@ export class SessionManager {
         checkpoints: [],
         variables: safeJsonParse<Record<string, unknown>>(conv.variables_json, {}),
         createdAt: conv.created_at,
-        updatedAt: conv.updated_at
+        updatedAt: conv.updated_at,
       }));
     } catch (err) {
       logger.error(err, 'listConversations 错误:');
@@ -100,21 +107,29 @@ export class SessionManager {
     }
   }
 
-  addMessage(conversationId: string, role: Message['role'], content: string, metadata?: Record<string, unknown>): Message {
+  addMessage(
+    conversationId: string,
+    role: Message['role'],
+    content: string,
+    metadata?: Record<string, unknown>
+  ): Message {
     const db = getDatabase();
     const message: Message = {
       id: uuidv4(),
       role,
       content,
       timestamp: Date.now(),
-      metadata
+      metadata,
     };
     const metadataJson = JSON.stringify(message.metadata || {});
 
-    db.run(`
+    db.run(
+      `
       INSERT INTO messages (id, conversation_id, role, content, metadata_json, "timestamp")
       VALUES (?, ?, ?, ?, ?, ?)
-    `, [message.id, conversationId, message.role, message.content, metadataJson, message.timestamp]);
+    `,
+      [message.id, conversationId, message.role, message.content, metadataJson, message.timestamp]
+    );
 
     db.run('UPDATE conversations SET updated_at = ? WHERE id = ?', [Date.now(), conversationId]);
 
@@ -144,10 +159,11 @@ export class SessionManager {
       const db = getDatabase();
       const existing = db.exec('SELECT id FROM conversations WHERE id = ?', [conversationId]);
       if (existing.length === 0 || existing[0].values.length === 0) return false;
-      db.run(
-        'UPDATE conversations SET variables_json = ?, updated_at = ? WHERE id = ?',
-        [JSON.stringify(variables), Date.now(), conversationId]
-      );
+      db.run('UPDATE conversations SET variables_json = ?, updated_at = ? WHERE id = ?', [
+        JSON.stringify(variables),
+        Date.now(),
+        conversationId,
+      ]);
       saveDatabase();
       return true;
     } catch (err) {

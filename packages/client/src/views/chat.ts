@@ -4,6 +4,13 @@ import { escapeHtml, formatRelativeTime } from '../utils.js';
 import { t } from '../i18n';
 import { MarkdownRenderer } from '../components/markdown.js';
 
+interface StreamPayload {
+  conversationId: string;
+  messageId: string;
+  chunk?: string;
+  error?: string;
+}
+
 export class ChatView {
   private shell: HTMLDivElement;
   private messagesEl: HTMLElement | null = null;
@@ -16,6 +23,7 @@ export class ChatView {
   private streaming = false;
   private assistantRenderers = new Map<string, { render: (text: string) => void }>();
   private assistantContents = new Map<string, string>();
+  private wsCleanupFns = new Map<HTMLDivElement, () => void>();
 
   constructor(api: API, conversationId: string) {
     this.api = api;
@@ -95,12 +103,12 @@ export class ChatView {
     ws.addEventListener('message', messageHandler);
 
     // Store cleanup reference
-    (this.shell as any)._wsCleanup = () => {
+    this.wsCleanupFns.set(this.shell, () => {
       ws.removeEventListener('message', messageHandler);
-    };
+    });
   }
 
-  private handleStreamChunk(payload: any): void {
+  private handleStreamChunk(payload: StreamPayload): void {
     const { messageId, chunk } = payload;
     const existing = this.assistantContents.get(messageId) || '';
     this.assistantContents.set(messageId, existing + chunk);
@@ -115,7 +123,7 @@ export class ChatView {
     }
   }
 
-  private handleStreamDone(payload: any): void {
+  private handleStreamDone(payload: StreamPayload): void {
     const { messageId } = payload;
     const renderer = this.assistantRenderers.get(messageId);
     if (renderer) {
@@ -129,7 +137,7 @@ export class ChatView {
     }
   }
 
-  private handleStreamError(payload: any): void {
+  private handleStreamError(payload: StreamPayload): void {
     const { messageId, error } = payload;
     const renderer = this.assistantRenderers.get(messageId);
     if (renderer) {
@@ -289,8 +297,9 @@ export class ChatView {
   }
 
   destroy() {
-    const cleanup = (this.shell as any)._wsCleanup;
+    const cleanup = this.wsCleanupFns.get(this.shell);
     if (cleanup) cleanup();
+    this.wsCleanupFns.delete(this.shell);
     this.shell.remove();
   }
 }

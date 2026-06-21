@@ -163,8 +163,8 @@ export class McpSkillsView {
       }
       await this.loadData();
       this.render();
-    } catch (err: any) {
-      showToast(err.message);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -241,8 +241,8 @@ export class McpSkillsView {
           showToast('MCP 安装成功');
           await this.loadData();
           this.render();
-        } catch (err: any) {
-          showToast(err.message);
+        } catch (err: unknown) {
+          showToast(err instanceof Error ? err.message : String(err));
           return false;
         }
       },
@@ -330,9 +330,9 @@ export class McpSkillsView {
           </div>
         `;
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (resultEl) {
-        resultEl.innerHTML = `<div class="skill-result-content error">❌ ${escapeHtml(err.message)}</div>`;
+        resultEl.innerHTML = `<div class="skill-result-content error">❌ ${escapeHtml(err instanceof Error ? err.message : String(err))}</div>`;
       }
     }
   }
@@ -344,8 +344,8 @@ export class McpSkillsView {
       showToast('技能已卸载');
       await this.loadData();
       this.render();
-    } catch (err: any) {
-      showToast(err.message);
+    } catch (err: unknown) {
+      showToast(err instanceof Error ? err.message : String(err));
     }
   }
 
@@ -388,8 +388,8 @@ export class McpSkillsView {
           showToast('技能安装成功');
           await this.loadData();
           this.render();
-        } catch (err: any) {
-          showToast(err.message);
+        } catch (err: unknown) {
+          showToast(err instanceof Error ? err.message : String(err));
           return false;
         }
       },

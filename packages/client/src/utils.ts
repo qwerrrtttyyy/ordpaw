@@ -21,7 +21,7 @@ export function escapeHtml(text: unknown): string {
  * 防抖函数 - 延迟执行以避免频繁调用
  * 用于搜索框、滚动事件、resize 等高频操作
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: never[]) => unknown>(
   fn: T,
   delay: number = 200
 ): (...args: Parameters<T>) => void {
@@ -36,7 +36,7 @@ export function debounce<T extends (...args: any[]) => any>(
  * 节流函数 - 限制单位时间内的执行次数
  * 用于动画、滚动等需要流畅体验的场景
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: never[]) => unknown>(
   fn: T,
   limit: number = 100
 ): (...args: Parameters<T>) => void {
@@ -132,7 +132,9 @@ export function createModal(opts: {
   const close = () => overlay.remove();
   overlay.querySelector('.modal-close')?.addEventListener('click', close);
   overlay.querySelector('[data-action="cancel"]')?.addEventListener('click', close);
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
 
   if (opts.onMount) opts.onMount(overlay);
   if (opts.onSubmit) {
@@ -154,12 +156,16 @@ export function detectOS(): OSType {
   if (typeof navigator === 'undefined') return 'unknown';
   const ua = navigator.userAgent.toLowerCase();
   const platform = (navigator.platform || '').toLowerCase();
-  if (/iphone|ipad|ipod/.test(ua) || platform.startsWith('mac') && 'ontouchend' in document) {
+  if (/iphone|ipad|ipod/.test(ua) || (platform.startsWith('mac') && 'ontouchend' in document)) {
     // iPadOS 上 userAgent 会伪装成 Mac，触摸检测可区分
     if (/iphone|ipod/.test(ua)) return 'ios';
     if (platform === 'iphone' || platform === 'ipad' || platform === 'ipod') return 'ios';
     // 同时有 maxTouchPoints 检测 iPadOS
-    if ((navigator as any).maxTouchPoints && (navigator as any).maxTouchPoints > 1) return 'ios';
+    if (
+      (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints &&
+      (navigator as Navigator & { maxTouchPoints?: number }).maxTouchPoints! > 1
+    )
+      return 'ios';
   }
   if (/mac/.test(ua) || platform.startsWith('mac')) return 'macos';
   if (/win/.test(ua) || platform.startsWith('win')) return 'windows';
@@ -176,49 +182,52 @@ export function applyOSEffects(os: OSType) {
   const root = document.documentElement;
   root.setAttribute('data-os', os);
 
-  const preset: Record<OSType, { blur: string; shadow: string; easing: string; radius: string; duration: number }> = {
+  const preset: Record<
+    OSType,
+    { blur: string; shadow: string; easing: string; radius: string; duration: number }
+  > = {
     macos: {
       blur: '20px',
       shadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
       easing: 'cubic-bezier(0.34, 1.56, 0.64, 1)',
       radius: '12px',
-      duration: 380
+      duration: 380,
     },
     ios: {
       blur: '24px',
       shadow: '0 6px 24px rgba(0, 0, 0, 0.18)',
       easing: 'cubic-bezier(0.32, 0.72, 0, 1)',
       radius: '14px',
-      duration: 320
+      duration: 320,
     },
     windows: {
       blur: '10px',
       shadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
       easing: 'cubic-bezier(0.1, 0.9, 0.2, 1)',
       radius: '6px',
-      duration: 220
+      duration: 220,
     },
     linux: {
       blur: '15px',
       shadow: '0 6px 24px rgba(0, 0, 0, 0.10)',
       easing: 'cubic-bezier(0.25, 0.1, 0.25, 1)',
       radius: '9px',
-      duration: 300
+      duration: 300,
     },
     android: {
       blur: '12px',
       shadow: '0 4px 20px rgba(0, 0, 0, 0.14)',
       easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
       radius: '8px',
-      duration: 260
+      duration: 260,
     },
     unknown: {
       blur: '12px',
       shadow: '0 4px 20px rgba(0, 0, 0, 0.10)',
       easing: 'ease-out',
       radius: '8px',
-      duration: 300
-    }
+      duration: 300,
+    },
   };
 
   const p = preset[os];
@@ -234,12 +243,18 @@ export function applyOSEffects(os: OSType) {
  */
 export function getOSAnimationDuration(os: OSType): number {
   switch (os) {
-    case 'macos': return 380;
-    case 'ios': return 320;
-    case 'windows': return 220;
-    case 'linux': return 300;
-    case 'android': return 260;
-    default: return 300;
+    case 'macos':
+      return 380;
+    case 'ios':
+      return 320;
+    case 'windows':
+      return 220;
+    case 'linux':
+      return 300;
+    case 'android':
+      return 260;
+    default:
+      return 300;
   }
 }
 

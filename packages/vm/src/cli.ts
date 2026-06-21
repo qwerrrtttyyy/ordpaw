@@ -46,9 +46,12 @@ export async function run(argv: string[]): Promise<void> {
           console.error('Error: version is required');
           process.exit(1);
         }
-        await installVersion(arg, process.env.ORDPAW_VM_MOCK_TARBALL
-          ? { tarballPath: process.env.ORDPAW_VM_MOCK_TARBALL }
-          : undefined);
+        await installVersion(
+          arg,
+          process.env.ORDPAW_VM_MOCK_TARBALL
+            ? { tarballPath: process.env.ORDPAW_VM_MOCK_TARBALL }
+            : undefined
+        );
         console.log(`Installed OrdPaw ${arg}`);
         break;
       }

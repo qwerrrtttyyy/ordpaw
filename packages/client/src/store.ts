@@ -19,8 +19,8 @@ export class Store {
       browserMaxBytes: 500 * 1024 * 1024,
       serverMaxBytes: 2 * 1024 * 1024 * 1024,
       enforce: true,
-      serverPath: './downloads'
-    }
+      serverPath: './downloads',
+    },
   };
 
   getSettings(): Settings {

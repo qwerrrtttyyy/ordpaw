@@ -105,7 +105,7 @@ class ComponentServerImpl {
     const byPlugin: Record<string, number> = {};
     for (const c of this.contributions) {
       byType[c.type] = (byType[c.type] || 0) + 1;
-      const plugin = c.metadata?.__plugin || 'unknown';
+      const plugin = String(c.metadata?.__plugin || 'unknown');
       byPlugin[plugin] = (byPlugin[plugin] || 0) + 1;
     }
     return {
@@ -263,7 +263,7 @@ class ComponentServerImpl {
         type: c.type,
         src: c.src,
         slot: c.slot,
-        plugin: c.metadata?.__plugin || 'unknown',
+        plugin: String(c.metadata?.__plugin || 'unknown'),
         children: [],
         metadata: c.metadata || {},
       };

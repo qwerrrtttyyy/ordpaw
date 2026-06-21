@@ -1,26 +1,36 @@
 import { API } from '../api';
 import { Store } from '../store';
 import { t } from '../i18n';
+import type { Agent, InstalledSkill } from '@ordpaw/shared';
 
 const PRESETS = [
   {
     id: 'starter',
     icon: '🐾',
     name: { zh: '入门套件', en: 'Starter Kit' },
-    desc: { zh: '创建一个通用助手 Agent 和两个示例脚本', en: 'A general assistant agent and two sample scripts' }
+    desc: {
+      zh: '创建一个通用助手 Agent 和两个示例脚本',
+      en: 'A general assistant agent and two sample scripts',
+    },
   },
   {
     id: 'writer',
     icon: '✍️',
     name: { zh: '写作助手', en: 'Writing Assistant' },
-    desc: { zh: '用于文章改写、润色和摘要的 Agent', en: 'Agent for rewriting, polishing and summarizing' }
+    desc: {
+      zh: '用于文章改写、润色和摘要的 Agent',
+      en: 'Agent for rewriting, polishing and summarizing',
+    },
   },
   {
     id: 'coder',
     icon: '💻',
     name: { zh: '代码专家', en: 'Code Expert' },
-    desc: { zh: '擅长解释代码、生成 HTML 预览的 Agent', en: 'Agent good at explaining code and HTML preview' }
-  }
+    desc: {
+      zh: '擅长解释代码、生成 HTML 预览的 Agent',
+      en: 'Agent good at explaining code and HTML preview',
+    },
+  },
 ];
 
 export class Dashboard {
@@ -63,13 +73,15 @@ export class Dashboard {
             </div>
           </div>
           <div class="preset-grid">
-            ${PRESETS.map(p => `
+            ${PRESETS.map(
+              (p) => `
               <div class="preset-card" data-preset="${p.id}">
                 <div class="preset-icon">${p.icon}</div>
                 <div class="preset-name">${p.name[locale === 'en-US' ? 'en' : 'zh']}</div>
                 <div class="preset-desc">${p.desc[locale === 'en-US' ? 'en' : 'zh']}</div>
               </div>
-            `).join('')}
+            `
+            ).join('')}
           </div>
         </div>
 
@@ -120,15 +132,21 @@ export class Dashboard {
               </div>
               <button class="btn btn-ghost btn-sm" id="viewAllAgents">${locale === 'en-US' ? 'View all' : '查看全部'}</button>
             </div>
-            ${agents.length === 0 ? `
+            ${
+              agents.length === 0
+                ? `
               <div class="empty-state" style="padding: 32px 20px;">
                 <div class="empty-state-icon">◉</div>
                 <div class="empty-state-title">${locale === 'en-US' ? 'No agents yet' : '还没有 Agent'}</div>
                 <div class="text-sm text-muted">${locale === 'en-US' ? 'Create your first agent' : '创建你的第一个智能体'}</div>
               </div>
-            ` : `
+            `
+                : `
               <div class="flex flex-col gap-3">
-                ${agents.slice(0, 3).map((a: any) => `
+                ${agents
+                  .slice(0, 3)
+                  .map(
+                    (a: Agent) => `
                   <div class="list-item accent">
                     <div class="list-item-icon">◉</div>
                     <div class="list-item-body">
@@ -139,9 +157,12 @@ export class Dashboard {
                       </div>
                     </div>
                   </div>
-                `).join('')}
+                `
+                  )
+                  .join('')}
               </div>
-            `}
+            `
+            }
           </div>
 
           <div class="card">
@@ -153,12 +174,18 @@ export class Dashboard {
               <span class="badge badge-sage">${skills.length} ${locale === 'en-US' ? 'items' : '个'}</span>
             </div>
             <div class="flex flex-col gap-3">
-              ${skills.length === 0 ? `
+              ${
+                skills.length === 0
+                  ? `
                 <div class="empty-state" style="padding: 32px 20px;">
                   <div class="empty-state-icon">◇</div>
                   <div class="empty-state-title">${t('common.empty')}</div>
                 </div>
-              ` : skills.slice(0, 4).map((s: any) => `
+              `
+                  : skills
+                      .slice(0, 4)
+                      .map(
+                        (s: InstalledSkill) => `
                 <div class="list-item sage">
                   <div class="list-item-icon">◇</div>
                   <div class="list-item-body">
@@ -166,7 +193,10 @@ export class Dashboard {
                     <div class="list-item-meta">${s.description || ''}</div>
                   </div>
                 </div>
-              `).join('')}
+              `
+                      )
+                      .join('')
+              }
             </div>
           </div>
         </div>
@@ -183,7 +213,7 @@ export class Dashboard {
       window.location.hash = '#/agents';
     });
 
-    content.querySelectorAll('[data-preset]').forEach(card => {
+    content.querySelectorAll('[data-preset]').forEach((card) => {
       card.addEventListener('click', () => {
         const preset = (card as HTMLElement).getAttribute('data-preset');
         if (preset) this.applyPreset(preset);
@@ -197,49 +227,59 @@ export class Dashboard {
       if (id === 'starter') {
         await this.api.createAgent({
           name: locale === 'en-US' ? 'General Assistant' : '通用助手',
-          description: locale === 'en-US' ? 'A helpful assistant with ScriptMCP' : '一个可以使用 ScriptMCP 的有用助手',
-          systemPrompt: locale === 'en-US'
-            ? 'You are a helpful assistant. You can use ScriptMCP tools to create, write, save, delete, list or execute scripts when needed.'
-            : '你是一个有帮助的助手。你可以在需要时使用 ScriptMCP 工具创建、写入、保存、删除、列出或执行脚本。',
-          model: 'gpt-4'
+          description:
+            locale === 'en-US'
+              ? 'A helpful assistant with ScriptMCP'
+              : '一个可以使用 ScriptMCP 的有用助手',
+          systemPrompt:
+            locale === 'en-US'
+              ? 'You are a helpful assistant. You can use ScriptMCP tools to create, write, save, delete, list or execute scripts when needed.'
+              : '你是一个有帮助的助手。你可以在需要时使用 ScriptMCP 工具创建、写入、保存、删除、列出或执行脚本。',
+          model: 'gpt-4',
         });
         await this.api.createScript({
           name: 'hello-world',
           description: locale === 'en-US' ? 'Greeting script' : '问候脚本',
           code: `function main(args) {\n  return { greeting: 'Hello, ' + (args.name || 'OrdPaw') + '!' };\n}\nmain($args);`,
-          language: 'javascript'
+          language: 'javascript',
         });
       } else if (id === 'writer') {
         await this.api.createAgent({
           name: locale === 'en-US' ? 'Writing Assistant' : '写作助手',
-          description: locale === 'en-US' ? 'Polish, rewrite and summarize text' : '润色、改写和摘要文本',
-          systemPrompt: locale === 'en-US'
-            ? 'You are a writing assistant. Improve clarity, grammar, and style. Support Chinese and English.'
-            : '你是写作助手。提升清晰度、语法和风格。支持中文和英文。',
-          model: 'gpt-4'
+          description:
+            locale === 'en-US' ? 'Polish, rewrite and summarize text' : '润色、改写和摘要文本',
+          systemPrompt:
+            locale === 'en-US'
+              ? 'You are a writing assistant. Improve clarity, grammar, and style. Support Chinese and English.'
+              : '你是写作助手。提升清晰度、语法和风格。支持中文和英文。',
+          model: 'gpt-4',
         });
         await this.api.createPrompt({
           name: locale === 'en-US' ? 'Polish Text' : '润色文本',
           category: '写作',
           content: '请润色以下文本，使其更流畅、专业：\n\n{{text}}',
-          variables: [{ name: 'text', description: '需要润色的文本', required: true }]
+          variables: [{ name: 'text', description: '需要润色的文本', required: true }],
         });
       } else if (id === 'coder') {
         await this.api.createAgent({
           name: locale === 'en-US' ? 'Code Expert' : '代码专家',
-          description: locale === 'en-US' ? 'Explain code and generate HTML previews' : '解释代码并生成 HTML 预览',
-          systemPrompt: locale === 'en-US'
-            ? 'You are a coding expert. Explain code clearly. When generating HTML/CSS/JS examples, wrap them in markdown code blocks so the UI can render previews.'
-            : '你是代码专家。清晰地解释代码。当生成 HTML/CSS/JS 示例时，请用 markdown 代码块包裹，以便 UI 渲染预览。',
-          model: 'gpt-4'
+          description:
+            locale === 'en-US'
+              ? 'Explain code and generate HTML previews'
+              : '解释代码并生成 HTML 预览',
+          systemPrompt:
+            locale === 'en-US'
+              ? 'You are a coding expert. Explain code clearly. When generating HTML/CSS/JS examples, wrap them in markdown code blocks so the UI can render previews.'
+              : '你是代码专家。清晰地解释代码。当生成 HTML/CSS/JS 示例时，请用 markdown 代码块包裹，以便 UI 渲染预览。',
+          model: 'gpt-4',
         });
       }
       await this.onStatsChange();
       await this.render();
       const msg = locale === 'en-US' ? 'Preset applied successfully' : '预设应用成功';
       this.toast(msg);
-    } catch (err: any) {
-      this.toast(err.message || 'Failed');
+    } catch (err: unknown) {
+      this.toast(err instanceof Error ? err.message : 'Failed');
     }
   }
 

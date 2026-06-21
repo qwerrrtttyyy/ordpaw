@@ -159,7 +159,7 @@ export class AnimationManager {
       onFrame: options.onFrame,
       onComplete: options.onComplete,
       cancelled: false,
-      lastProgress: -1
+      lastProgress: -1,
     };
 
     this.tasks.set(id, task);
@@ -265,24 +265,27 @@ export class AnimationManager {
   private initIntersectionObserver() {
     if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') return;
 
-    this.intersectionObserver = new IntersectionObserver((entries) => {
-      let anyVisible = false;
-      for (const entry of entries) {
-        const taskIds = this.observedElements.get(entry.target);
-        if (taskIds) {
-          if (!entry.isIntersecting) {
-            for (const id of taskIds) {
-              this.cancel(id);
+    this.intersectionObserver = new IntersectionObserver(
+      (entries) => {
+        let anyVisible = false;
+        for (const entry of entries) {
+          const taskIds = this.observedElements.get(entry.target);
+          if (taskIds) {
+            if (!entry.isIntersecting) {
+              for (const id of taskIds) {
+                this.cancel(id);
+              }
             }
           }
+          if (entry.isIntersecting) {
+            anyVisible = true;
+          }
         }
-        if (entry.isIntersecting) {
-          anyVisible = true;
-        }
-      }
-      // 简单策略：当没有任何观察元素可见时暂停非必要动画循环
-      this.visibilityPaused = !anyVisible && this.observedElements.size > 0;
-    }, { threshold: 0 });
+        // 简单策略：当没有任何观察元素可见时暂停非必要动画循环
+        this.visibilityPaused = !anyVisible && this.observedElements.size > 0;
+      },
+      { threshold: 0 }
+    );
   }
 
   /**
@@ -383,10 +386,10 @@ export class AnimationManager {
     linear: (t: number) => t,
     easeIn: (t: number) => t * t,
     easeOut: (t: number) => 1 - (1 - t) * (1 - t),
-    easeInOut: (t: number) => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2,
+    easeInOut: (t: number) => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2),
     cubicIn: (t: number) => t * t * t,
     cubicOut: (t: number) => 1 - Math.pow(1 - t, 3),
-    cubicInOut: (t: number) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2,
+    cubicInOut: (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2),
     elastic: (t: number) => {
       const c4 = (2 * Math.PI) / 3;
       return t === 0 ? 0 : t === 1 ? 1 : Math.pow(2, -10 * t) * Math.sin((t * 10 - 0.75) * c4) + 1;
@@ -403,14 +406,14 @@ export class AnimationManager {
       } else {
         return n1 * (t -= 2.625 / d1) * t + 0.984375;
       }
-    }
+    },
   };
 
   /**
    * 简化 API - 淡入动画
    */
   fadeIn(el: HTMLElement, duration = 300): Promise<void> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.promoteLayer(el, ['opacity'], duration + 100);
       el.style.opacity = '0';
       this.animate({
@@ -425,7 +428,7 @@ export class AnimationManager {
           el.style.opacity = '';
           this.demoteLayer(el);
           resolve();
-        }
+        },
       });
     });
   }
@@ -434,7 +437,7 @@ export class AnimationManager {
    * 简化 API - 淡出动画
    */
   fadeOut(el: HTMLElement, duration = 300): Promise<void> {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       this.promoteLayer(el, ['opacity'], duration + 100);
       this.animate({
         duration,
@@ -448,7 +451,7 @@ export class AnimationManager {
           el.style.opacity = '';
           this.demoteLayer(el);
           resolve();
-        }
+        },
       });
     });
   }
@@ -456,13 +459,17 @@ export class AnimationManager {
   /**
    * 简化 API - 滑入动画
    */
-  slideIn(el: HTMLElement, direction: 'up' | 'down' | 'left' | 'right' = 'up', duration = 300): Promise<void> {
-    return new Promise(resolve => {
+  slideIn(
+    el: HTMLElement,
+    direction: 'up' | 'down' | 'left' | 'right' = 'up',
+    duration = 300
+  ): Promise<void> {
+    return new Promise((resolve) => {
       const transforms = {
         up: 'translateY(20px)',
         down: 'translateY(-20px)',
         left: 'translateX(20px)',
-        right: 'translateX(-20px)'
+        right: 'translateX(-20px)',
       };
 
       this.promoteLayer(el, ['transform', 'opacity'], duration + 100);
@@ -490,7 +497,7 @@ export class AnimationManager {
           el.style.opacity = '';
           this.demoteLayer(el);
           resolve();
-        }
+        },
       });
     });
   }
@@ -505,7 +512,7 @@ export class AnimationManager {
       targetFps: this.targetFps,
       enabled: this.enabled,
       running: this.running,
-      performanceTier: this.performanceTier
+      performanceTier: this.performanceTier,
     };
   }
 }
@@ -530,14 +537,25 @@ export function detectPerformanceTier(): 'high' | 'medium' | 'low' {
   if (prefersReducedMotion()) return 'low';
 
   // 低电量模式
-  const battery = (navigator as any).battery || (navigator as any).getBattery?.();
-  if (battery?.saveData || battery?.charging === false && battery?.level < 0.2) {
+  const navExt = navigator as Navigator & {
+    getBattery?: () => Promise<{ charging?: boolean; level?: number }>;
+  };
+  const navBattery = (
+    navigator as Navigator & {
+      battery?: { saveData?: boolean; charging?: boolean; level?: number };
+    }
+  ).battery;
+  const battery = navBattery || navExt.getBattery?.();
+  if (
+    navBattery?.saveData ||
+    (navBattery?.charging === false && navBattery?.level !== undefined && navBattery.level < 0.2)
+  ) {
     return 'low';
   }
 
   // 根据逻辑核心数与内存粗略分级
   const cores = navigator.hardwareConcurrency || 4;
-  const memory = (navigator as any).deviceMemory || 4;
+  const memory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory || 4;
 
   if (cores <= 2 || memory <= 2) return 'low';
   if (cores <= 4 || memory <= 4) return 'medium';

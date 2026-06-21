@@ -1,6 +1,6 @@
 import { Router, Request, Response, Application } from 'express';
 import { v4 as uuidv4 } from 'uuid';
-import type { Provider, Settings } from '@ordpaw/shared';
+import type { Provider, Settings, DebugLogEntry } from '@ordpaw/shared';
 import { agentRuntime } from '../core/agent-runtime.js';
 import { sessionManager } from '../core/session.js';
 import { checkpointManager } from '../core/checkpoint.js';
@@ -16,6 +16,7 @@ import { getDatabase, saveDatabase } from '../db/index.js';
 import { setupDownloadRoutes } from '../core/download-service.js';
 import { asyncHandler, ApiError, validateBody } from '../middleware.js';
 import { rowToObject, safeJsonParse, safeCount as dbSafeCount } from '../db/utils.js';
+import type { BindParams } from 'sql.js';
 
 const DEFAULT_SETTINGS: Settings = {
   theme: 'ordpaw-light',
@@ -917,7 +918,7 @@ export function setupApiRoutes(app: Application) {
       const conv = rowToObject(convResult[0].columns, convResult[0].values[0]);
 
       const queryAllLocal = (sql: string, params?: unknown[]) => {
-        const result = params ? db.exec(sql, params) : db.exec(sql);
+        const result = params ? db.exec(sql, params as BindParams) : db.exec(sql);
         if (result.length === 0) return [];
         return result[0].values.map((row: unknown[]) => rowToObject(result[0].columns, row));
       };
@@ -966,7 +967,7 @@ export function setupApiRoutes(app: Application) {
           try {
             db.run(
               `INSERT OR REPLACE INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`,
-              vals
+              vals as BindParams
             );
           } catch {
             // 忽略重复或错误

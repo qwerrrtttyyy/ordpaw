@@ -11,11 +11,17 @@ describe('DownloadManager', () => {
     store = {};
     global.localStorage = {
       getItem: vi.fn((key: string) => store[key] || null),
-      setItem: vi.fn((key: string, value: string) => { store[key] = value; }),
-      removeItem: vi.fn((key: string) => { delete store[key]; }),
-      clear: vi.fn(() => { store = {}; }),
+      setItem: vi.fn((key: string, value: string) => {
+        store[key] = value;
+      }),
+      removeItem: vi.fn((key: string) => {
+        delete store[key];
+      }),
+      clear: vi.fn(() => {
+        store = {};
+      }),
       length: 0,
-      key: vi.fn()
+      key: vi.fn(),
     } as any;
 
     global.indexedDB = undefined as any;
@@ -30,7 +36,9 @@ describe('DownloadManager', () => {
   });
 
   it('adds a task', () => {
-    const task = manager.addTask([{ id: 'item-1', type: 'source', size: 100 }], { storage: 'browser' });
+    const task = manager.addTask([{ id: 'item-1', type: 'source', size: 100 }], {
+      storage: 'browser',
+    });
     expect(task.status).toBe('pending');
     expect(task.items.length).toBe(1);
     expect(manager.getTasks().length).toBe(1);

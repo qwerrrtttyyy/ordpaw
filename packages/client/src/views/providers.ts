@@ -36,32 +36,36 @@ export class ProvidersView {
         </div>
       </div>
 
-      ${providers.length === 0 ? `
+      ${
+        providers.length === 0
+          ? `
         <div class="empty-state">
           <div class="empty-state-icon">▣</div>
           <div class="empty-state-title">${t('common.empty')}</div>
         </div>
-      ` : `
+      `
+          : `
         <div class="grid grid-2" id="providers-list">
-          ${providers.map(p => this.renderCard(p)).join('')}
+          ${providers.map((p) => this.renderCard(p)).join('')}
         </div>
-      `}
+      `
+      }
     `;
 
     document.getElementById('createProviderBtn')?.addEventListener('click', () => this.showModal());
-    content.querySelectorAll('.provider-edit').forEach(btn => {
+    content.querySelectorAll('.provider-edit').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id) this.showModal(id);
       });
     });
-    content.querySelectorAll('.provider-delete').forEach(btn => {
+    content.querySelectorAll('.provider-delete').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         if (id && confirm(t('provider.deleteConfirm'))) this.deleteProvider(id);
       });
     });
-    content.querySelectorAll('.provider-toggle').forEach(btn => {
+    content.querySelectorAll('.provider-toggle').forEach((btn) => {
       btn.addEventListener('click', () => {
         const id = (btn as HTMLElement).getAttribute('data-id');
         const enabled = (btn as HTMLElement).getAttribute('data-enabled') === 'true';
@@ -71,7 +75,7 @@ export class ProvidersView {
   }
 
   private renderCard(p: Provider) {
-    const models = p.models.map(m => m.name).join(', ') || '-';
+    const models = p.models.map((m) => m.name).join(', ') || '-';
     return `
       <div class="card">
         <div class="card-header">
@@ -93,10 +97,12 @@ export class ProvidersView {
   }
 
   private async showModal(id?: string) {
-    const provider = id ? await this.api.getProviderModels(id).then(async () => {
-      const list = await this.api.getProviders();
-      return list.find(p => p.id === id);
-    }) : undefined;
+    const provider = id
+      ? await this.api.getProviderModels(id).then(async () => {
+          const list = await this.api.getProviders();
+          return list.find((p) => p.id === id);
+        })
+      : undefined;
 
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -129,7 +135,7 @@ export class ProvidersView {
         </div>
         <div class="form-group">
           <label class="form-label">${t('provider.models')}</label>
-          <input type="text" class="input" id="pModels" value="${provider ? this.escapeHtml(provider.models.map(m => m.id).join(', ')) : ''}" placeholder="gpt-4o, claude-3-5-sonnet">
+          <input type="text" class="input" id="pModels" value="${provider ? this.escapeHtml(provider.models.map((m) => m.id).join(', ')) : ''}" placeholder="gpt-4o, claude-3-5-sonnet">
         </div>
         <div class="modal-footer">
           <button class="btn btn-ghost" id="cancelModal">${t('common.cancel')}</button>
@@ -145,11 +151,18 @@ export class ProvidersView {
 
     document.getElementById('saveProvider')?.addEventListener('click', async () => {
       const name = (document.getElementById('pName') as HTMLInputElement).value.trim();
-      const type = (document.getElementById('pType') as HTMLSelectElement).value as any;
+      const type = (document.getElementById('pType') as HTMLSelectElement)
+        .value as Provider['type'];
       const baseUrl = (document.getElementById('pBaseUrl') as HTMLInputElement).value.trim();
       const apiKey = (document.getElementById('pApiKey') as HTMLInputElement).value.trim();
       const modelsRaw = (document.getElementById('pModels') as HTMLInputElement).value.trim();
-      const models = modelsRaw ? modelsRaw.split(',').map(s => s.trim()).filter(Boolean).map(id => ({ id, name: id })) : [];
+      const models = modelsRaw
+        ? modelsRaw
+            .split(',')
+            .map((s) => s.trim())
+            .filter(Boolean)
+            .map((id) => ({ id, name: id }))
+        : [];
       const data = { name, type, baseUrl, apiKey, models };
 
       if (id) {

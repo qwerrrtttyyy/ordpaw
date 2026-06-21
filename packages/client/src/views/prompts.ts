@@ -1,5 +1,6 @@
 import { API } from '../api';
 import { Store } from '../store';
+import type { PromptTemplate } from '@ordpaw/shared';
 
 export class PromptsView {
   private api: API;
@@ -27,7 +28,9 @@ export class PromptsView {
           </button>
         </div>
 
-        ${prompts.length === 0 ? `
+        ${
+          prompts.length === 0
+            ? `
           <div class="card">
             <div class="empty-state">
               <div class="empty-state-icon">◍</div>
@@ -35,9 +38,12 @@ export class PromptsView {
               <div class="text-sm text-muted">创建可复用的提示词模板</div>
             </div>
           </div>
-        ` : `
+        `
+            : `
           <div class="grid grid-2">
-            ${prompts.map((p: any) => `
+            ${prompts
+              .map(
+                (p: PromptTemplate) => `
               <div class="card">
                 <div class="flex items-start gap-3 mb-4">
                   <div class="list-item-icon violet" style="width: 44px; height: 44px;">◍</div>
@@ -58,9 +64,12 @@ export class PromptsView {
                   <button class="btn btn-ghost btn-sm delete-btn" data-id="${p.id}">删除</button>
                 </div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
-        `}
+        `
+        }
       </div>
     `;
 
@@ -68,15 +77,15 @@ export class PromptsView {
       this.showPromptModal();
     });
 
-    content.querySelectorAll('.edit-btn').forEach(btn => {
+    content.querySelectorAll('.edit-btn').forEach((btn) => {
       btn.addEventListener('click', (e) => {
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
-        const prompt = prompts.find((p: any) => p.id === id);
+        const prompt = prompts.find((p: PromptTemplate) => p.id === id);
         if (prompt) this.showPromptModal(prompt);
       });
     });
 
-    content.querySelectorAll('.delete-btn').forEach(btn => {
+    content.querySelectorAll('.delete-btn').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
@@ -89,13 +98,10 @@ export class PromptsView {
   }
 
   private escapeHtml(text: string): string {
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
-  private showPromptModal(prompt?: any) {
+  private showPromptModal(prompt?: PromptTemplate) {
     const isEdit = !!prompt;
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
@@ -111,7 +117,7 @@ export class PromptsView {
         </div>
         <div class="form-group">
           <label class="form-label">分类</label>
-          <input type="text" class="input" id="promptCategory" value="${isEdit ? (prompt.category || '') : '通用'}">
+          <input type="text" class="input" id="promptCategory" value="${isEdit ? prompt.category || '' : '通用'}">
         </div>
         <div class="form-group">
           <label class="form-label">内容（支持 <code>{{变量}}</code> 插值）</label>
@@ -128,11 +134,14 @@ export class PromptsView {
     const close = () => overlay.remove();
     overlay.querySelector('#closeBtn')?.addEventListener('click', close);
     overlay.querySelector('#cancelBtn')?.addEventListener('click', close);
-    overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
 
     overlay.querySelector('#confirmBtn')?.addEventListener('click', async () => {
       const name = (overlay.querySelector('#promptName') as HTMLInputElement)?.value;
-      const category = (overlay.querySelector('#promptCategory') as HTMLInputElement)?.value || '通用';
+      const category =
+        (overlay.querySelector('#promptCategory') as HTMLInputElement)?.value || '通用';
       const content = (overlay.querySelector('#promptContent') as HTMLTextAreaElement)?.value;
       if (!name || !content) {
         alert('请填写名称和内容');

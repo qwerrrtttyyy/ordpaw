@@ -36,13 +36,21 @@ describe('db/utils', () => {
   describe('queryAll', () => {
     it('returns mapped rows for non-empty result', () => {
       const db = {
-        exec: vi.fn(() => [{
-          columns: ['id', 'name'],
-          values: [['1', 'Alice'], ['2', 'Bob']]
-        }])
+        exec: vi.fn(() => [
+          {
+            columns: ['id', 'name'],
+            values: [
+              ['1', 'Alice'],
+              ['2', 'Bob'],
+            ],
+          },
+        ]),
       };
       const rows = queryAll(db, 'SELECT * FROM users');
-      expect(rows).toEqual([{ id: '1', name: 'Alice' }, { id: '2', name: 'Bob' }]);
+      expect(rows).toEqual([
+        { id: '1', name: 'Alice' },
+        { id: '2', name: 'Bob' },
+      ]);
       expect(db.exec).toHaveBeenCalledWith('SELECT * FROM users', []);
     });
 
@@ -58,10 +66,12 @@ describe('db/utils', () => {
 
     it('passes params to exec', () => {
       const db = {
-        exec: vi.fn(() => [{
-          columns: ['id'],
-          values: [['1']]
-        }])
+        exec: vi.fn(() => [
+          {
+            columns: ['id'],
+            values: [['1']],
+          },
+        ]),
       };
       queryAll(db, 'SELECT * FROM users WHERE id = ?', ['1']);
       expect(db.exec).toHaveBeenCalledWith('SELECT * FROM users WHERE id = ?', ['1']);
@@ -71,10 +81,15 @@ describe('db/utils', () => {
   describe('queryOne', () => {
     it('returns first row when present', () => {
       const db = {
-        exec: vi.fn(() => [{
-          columns: ['id', 'name'],
-          values: [['1', 'Alice'], ['2', 'Bob']]
-        }])
+        exec: vi.fn(() => [
+          {
+            columns: ['id', 'name'],
+            values: [
+              ['1', 'Alice'],
+              ['2', 'Bob'],
+            ],
+          },
+        ]),
       };
       expect(queryOne(db, 'SELECT * FROM users')).toEqual({ id: '1', name: 'Alice' });
     });

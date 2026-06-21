@@ -54,11 +54,11 @@ export class DebugView {
     this.renderTab();
     this.startStream();
 
-    content.querySelectorAll('.tab').forEach(tab => {
+    content.querySelectorAll('.tab').forEach((tab) => {
       tab.addEventListener('click', () => {
-        const tName = tab.getAttribute('data-tab') as any;
+        const tName = tab.getAttribute('data-tab') as 'logs' | 'events' | 'metrics' | 'animation';
         this.activeTab = tName;
-        content.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+        content.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
         tab.classList.add('active');
         this.renderTab();
       });
@@ -68,7 +68,8 @@ export class DebugView {
       const debugMode = (e.target as HTMLInputElement).checked;
       await this.api.updateSettings({ debugMode });
       this.store.setSettings({ debugMode });
-      if (debugMode) this.startStream(); else this.stopStream();
+      if (debugMode) this.startStream();
+      else this.stopStream();
       this.renderTab();
     });
   }
@@ -99,7 +100,7 @@ export class DebugView {
             </div>
           </div>
           <div class="log-stream" id="logStream">
-            ${this.logs.length === 0 ? `<div class="text-muted text-sm">${t('common.empty')}</div>` : this.logs.map(log => this.renderLogLine(log)).join('')}
+            ${this.logs.length === 0 ? `<div class="text-muted text-sm">${t('common.empty')}</div>` : this.logs.map((log) => this.renderLogLine(log)).join('')}
           </div>
         </div>
       `;
@@ -128,16 +129,20 @@ export class DebugView {
             </div>
             <button class="btn btn-ghost btn-sm" id="refreshEventsBtn">${t('common.refresh')}</button>
           </div>
-          ${this.events.length === 0 ? `
+          ${
+            this.events.length === 0
+              ? `
             <div class="empty-state" style="padding: 40px 20px;">
               <div class="empty-state-icon">◉</div>
               <div class="empty-state-title">${t('common.empty')}</div>
             </div>
-          ` : `
+          `
+              : `
             <div class="timeline" id="eventTimeline">
-              ${this.events.map(e => this.renderEvent(e)).join('')}
+              ${this.events.map((e) => this.renderEvent(e)).join('')}
             </div>
-          `}
+          `
+          }
         </div>
       `;
       document.getElementById('refreshEventsBtn')?.addEventListener('click', async () => {
@@ -258,7 +263,7 @@ export class DebugView {
             },
             onComplete: () => {
               box.style.transform = '';
-            }
+            },
           });
         }
       });
@@ -324,11 +329,11 @@ export class DebugView {
     if (this.eventSource) return;
     try {
       this.eventSource = this.api.subscribeDebugStream(
-        entry => {
+        (entry) => {
           this.logs.unshift(entry);
           if (this.activeTab === 'logs') this.renderTab();
         },
-        event => {
+        (event) => {
           this.events.unshift(event);
           if (this.activeTab === 'events') this.renderTab();
         }

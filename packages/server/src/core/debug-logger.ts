@@ -14,7 +14,9 @@ class DebugLogger {
   constructor() {
     // 订阅所有事件总线事件
     eventBus.on('*', (payload: unknown) => {
-      const meta = (payload as Record<string, unknown> | undefined)?.__eventMeta as Record<string, unknown> | undefined;
+      const meta = (payload as Record<string, unknown> | undefined)?.__eventMeta as
+        | Record<string, unknown>
+        | undefined;
       const type = typeof meta?.type === 'string' ? meta.type : 'unknown';
       this.pushEvent(type, payload);
     });
@@ -28,18 +30,23 @@ class DebugLogger {
     return this.debugMode;
   }
 
-  log(level: DebugLogEntry['level'], message: string, source?: string, metadata?: Record<string, unknown>) {
+  log(
+    level: DebugLogEntry['level'],
+    message: string,
+    source?: string,
+    metadata?: Record<string, unknown>
+  ) {
     const entry: DebugLogEntry = {
       id: Math.random().toString(36).slice(2, 10),
       time: Date.now(),
       level,
       message,
       source,
-      metadata
+      metadata,
     };
     this.logs.unshift(entry);
     if (this.logs.length > MAX_LOGS) this.logs.pop();
-    this.listeners.forEach(fn => fn(entry));
+    this.listeners.forEach((fn) => fn(entry));
   }
 
   pushEvent(type: string, payload: unknown) {
@@ -47,17 +54,17 @@ class DebugLogger {
       id: Math.random().toString(36).slice(2, 10),
       time: Date.now(),
       type,
-      payload
+      payload,
     };
     this.events.unshift(entry);
     if (this.events.length > MAX_EVENTS) this.events.pop();
-    this.eventListeners.forEach(fn => fn(entry));
+    this.eventListeners.forEach((fn) => fn(entry));
   }
 
   getLogs(level?: DebugLogEntry['level'], limit = 100): DebugLogEntry[] {
     let list = this.logs;
     if (level) {
-      list = list.filter(l => l.level === level);
+      list = list.filter((l) => l.level === level);
     }
     return list.slice(0, limit);
   }
@@ -65,7 +72,7 @@ class DebugLogger {
   getEvents(type?: string, limit = 100): DebugEventEntry[] {
     let list = this.events;
     if (type) {
-      list = list.filter(e => e.type === type);
+      list = list.filter((e) => e.type === type);
     }
     return list.slice(0, limit);
   }

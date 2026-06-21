@@ -12,7 +12,7 @@ module.exports = {
     browser: true,
     es2022: true,
   },
-  ignorePatterns: ['dist', 'node_modules', '.pnpm-store', 'coverage'],
+  ignorePatterns: ['dist', 'node_modules', '.pnpm-store', 'coverage', 'packages/server/data'],
   rules: {
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': [

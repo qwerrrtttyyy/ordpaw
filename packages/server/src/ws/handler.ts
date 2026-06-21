@@ -14,15 +14,21 @@ function chunkResponse(text: string): string[] {
   for (const ch of text) {
     const code = ch.codePointAt(0) ?? 0;
     const isCJK =
-      (code >= 0x3000 && code <= 0x30ff) ||  // CJK + Japanese punctuation
-      (code >= 0x3400 && code <= 0x9fff) ||  // CJK Unified Ideographs
-      (code >= 0xff00 && code <= 0xffef) ||  // Fullwidth
-      (code >= 0x4e00 && code <= 0x9fff);    // CJK Unified
+      (code >= 0x3000 && code <= 0x30ff) || // CJK + Japanese punctuation
+      (code >= 0x3400 && code <= 0x9fff) || // CJK Unified Ideographs
+      (code >= 0xff00 && code <= 0xffef) || // Fullwidth
+      (code >= 0x4e00 && code <= 0x9fff); // CJK Unified
     if (isCJK) {
-      if (buffer) { chunks.push(buffer); buffer = ''; }
+      if (buffer) {
+        chunks.push(buffer);
+        buffer = '';
+      }
       chunks.push(ch);
     } else if (ch === ' ' || ch === '\n' || ch === '\t') {
-      if (buffer) { chunks.push(buffer); buffer = ''; }
+      if (buffer) {
+        chunks.push(buffer);
+        buffer = '';
+      }
       chunks.push(ch);
     } else {
       buffer += ch;
@@ -83,10 +89,12 @@ export function setupWebSocket(wss: WebSocketServer) {
           }
 
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'chat:start',
-              payload: { conversationId }
-            }));
+            ws.send(
+              JSON.stringify({
+                type: 'chat:start',
+                payload: { conversationId },
+              })
+            );
           }
 
           const response = await agentRuntime.processMessage(conversationId, content);
@@ -101,25 +109,29 @@ export function setupWebSocket(wss: WebSocketServer) {
             const chunks = chunkResponse(response.content);
             for (let i = 0; i < chunks.length; i++) {
               if (ws.readyState !== WebSocket.OPEN) break;
-              await new Promise(resolve => setTimeout(resolve, 30));
-              ws.send(JSON.stringify({
-                type: 'chat:stream',
-                payload: {
-                  conversationId,
-                  chunk: chunks[i],
-                  done: i === chunks.length - 1
-                }
-              }));
+              await new Promise((resolve) => setTimeout(resolve, 30));
+              ws.send(
+                JSON.stringify({
+                  type: 'chat:stream',
+                  payload: {
+                    conversationId,
+                    chunk: chunks[i],
+                    done: i === chunks.length - 1,
+                  },
+                })
+              );
             }
           } catch (streamErr: unknown) {
             logger.error(streamErr, '流式发送错误:');
           }
 
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'chat:done',
-              payload: { conversationId, message: response }
-            }));
+            ws.send(
+              JSON.stringify({
+                type: 'chat:done',
+                payload: { conversationId, message: response },
+              })
+            );
           }
         } else if (message.type === 'ping') {
           if (ws.readyState === WebSocket.OPEN) {
@@ -157,10 +169,12 @@ export function setupWebSocket(wss: WebSocketServer) {
 function sendError(ws: WebSocket, message: string) {
   try {
     if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({
-        type: 'error',
-        payload: { message }
-      }));
+      ws.send(
+        JSON.stringify({
+          type: 'error',
+          payload: { message },
+        })
+      );
     }
   } catch (err) {
     logger.error(err, '发送错误消息失败:');

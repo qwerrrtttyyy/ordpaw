@@ -11,7 +11,7 @@ import type {
   DownloadResourceType,
   StorageQuota,
 } from '@ordpaw/shared';
-import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
+import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors';
 import { getDatabase } from '../db/index.js';
 import { skillRunner } from './skill-runner.js';
 import { scriptMcp } from './script-mcp.js';

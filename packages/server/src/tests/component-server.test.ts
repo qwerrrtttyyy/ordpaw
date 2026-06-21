@@ -4,7 +4,7 @@ import type { ComponentContribution } from '@ordpaw/shared';
 // Mock dependencies
 vi.mock('fs');
 vi.mock('sql.js', () => ({
-  default: vi.fn(() => Promise.resolve({}))
+  default: vi.fn(() => Promise.resolve({})),
 }));
 
 describe('ComponentServer', () => {
@@ -19,7 +19,7 @@ describe('ComponentServer', () => {
     const contributions: ComponentContribution[] = [
       { name: 'root', type: 'component', src: 'root.js' },
       { name: 'header', type: 'component', src: 'header.js' },
-      { name: 'footer', type: 'component', src: 'footer.js' }
+      { name: 'footer', type: 'component', src: 'footer.js' },
     ];
 
     server.register('test-plugin', contributions, '/fake/path');
@@ -33,7 +33,7 @@ describe('ComponentServer', () => {
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
-      { name: 'comp1', type: 'component', src: 'comp1.js' }
+      { name: 'comp1', type: 'component', src: 'comp1.js' },
     ];
 
     server.register('test-plugin', contributions, '/fake/path');
@@ -49,7 +49,7 @@ describe('ComponentServer', () => {
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
-      { name: 'comp', type: 'component', src: './comp.js' }
+      { name: 'comp', type: 'component', src: './comp.js' },
     ];
 
     server.register('my-plugin', contributions, '/fake/path');
@@ -63,7 +63,7 @@ describe('ComponentServer', () => {
     const server = new mod.ComponentServer();
 
     const contributions: ComponentContribution[] = [
-      { name: 'cdn-comp', type: 'component', src: 'https://cdn.example.com/comp.js' }
+      { name: 'cdn-comp', type: 'component', src: 'https://cdn.example.com/comp.js' },
     ];
 
     server.register('my-plugin', contributions, '/fake/path');

@@ -8,8 +8,8 @@ vi.mock('../db/index.js', () => ({
   saveDatabase: vi.fn(),
   default: {
     getDatabase: () => memoryDb,
-    saveDatabase: vi.fn()
-  }
+    saveDatabase: vi.fn(),
+  },
 }));
 
 describe('SessionManager', () => {
@@ -64,7 +64,7 @@ describe('SessionManager', () => {
 
     const filtered = sessionManager.listConversations(agentA);
     expect(filtered.length).toBe(2);
-    expect(filtered.every(c => c.agentId === agentA)).toBe(true);
+    expect(filtered.every((c) => c.agentId === agentA)).toBe(true);
   });
 
   it('adds messages to a conversation', async () => {
@@ -118,7 +118,11 @@ describe('SessionManager', () => {
   it('safely handles getConversation database errors', async () => {
     const { sessionManager } = await import('../core/session.js');
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const brokenDb = { exec: () => { throw new Error('db down'); } };
+    const brokenDb = {
+      exec: () => {
+        throw new Error('db down');
+      },
+    };
     memoryDb = brokenDb;
 
     const result = sessionManager.getConversation('any');

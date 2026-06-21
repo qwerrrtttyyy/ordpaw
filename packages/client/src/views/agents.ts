@@ -1,7 +1,7 @@
 import { API } from '../api';
 import { Store } from '../store';
 import { t } from '../i18n';
-import type { Provider } from '@ordpaw/shared';
+import type { Provider, Agent } from '@ordpaw/shared';
 
 export class AgentsView {
   private api: API;
@@ -36,7 +36,9 @@ export class AgentsView {
           </button>
         </div>
 
-        ${agents.length === 0 ? `
+        ${
+          agents.length === 0
+            ? `
           <div class="card">
             <div class="empty-state">
               <div class="empty-state-icon">◉</div>
@@ -45,9 +47,12 @@ export class AgentsView {
               <button class="btn btn-primary" id="emptyCreateBtn">${t('agent.create')}</button>
             </div>
           </div>
-        ` : `
+        `
+            : `
           <div class="grid grid-2">
-            ${agents.map((a: any) => `
+            ${agents
+              .map(
+                (a: Agent) => `
               <div class="card">
                 <div class="flex items-start gap-3 mb-4">
                   <div class="list-item-icon accent" style="width: 44px; height: 44px;">◉</div>
@@ -66,9 +71,12 @@ export class AgentsView {
                   <button class="btn btn-ghost btn-sm delete-btn" data-id="${a.id}">${t('common.delete')}</button>
                 </div>
               </div>
-            `).join('')}
+            `
+              )
+              .join('')}
           </div>
-        `}
+        `
+        }
       </div>
     `;
 
@@ -76,7 +84,7 @@ export class AgentsView {
     document.getElementById('createAgentBtn')?.addEventListener('click', createHandler);
     document.getElementById('emptyCreateBtn')?.addEventListener('click', createHandler);
 
-    content.querySelectorAll('.edit-btn').forEach(btn => {
+    content.querySelectorAll('.edit-btn').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
         if (id) {
@@ -86,7 +94,7 @@ export class AgentsView {
       });
     });
 
-    content.querySelectorAll('.delete-btn').forEach(btn => {
+    content.querySelectorAll('.delete-btn').forEach((btn) => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const id = (e.currentTarget as HTMLElement).getAttribute('data-id');
@@ -101,7 +109,9 @@ export class AgentsView {
 
   private showCreateModal() {
     const defaultProvider = this.providers[0];
-    this.createModal(t('agent.create'), `
+    this.createModal(
+      t('agent.create'),
+      `
       <div class="form-group">
         <label class="form-label">${t('agent.name')} *</label>
         <input type="text" class="input" id="agentName" placeholder="${t('agent.name')}">
@@ -126,25 +136,30 @@ export class AgentsView {
           ${this.renderModelOptions(defaultProvider?.id, defaultProvider?.models[0]?.id)}
         </select>
       </div>
-    `, async (modal) => {
-      const name = (modal.querySelector('#agentName') as HTMLInputElement)?.value;
-      const description = (modal.querySelector('#agentDesc') as HTMLInputElement)?.value;
-      const systemPrompt = (modal.querySelector('#agentPrompt') as HTMLTextAreaElement)?.value;
-      const providerId = (modal.querySelector('#agentProvider') as HTMLSelectElement)?.value;
-      const model = (modal.querySelector('#agentModel') as HTMLSelectElement)?.value;
-      if (!name) {
-        alert(this.store.getLocale() === 'en-US' ? 'Name is required' : '请填写名称');
-        return false;
-      }
-      await this.api.createAgent({ name, description, systemPrompt, providerId, model });
-      await this.onStatsChange();
-      return true;
-    }, () => this.bindProviderModelSync());
+    `,
+      async (modal) => {
+        const name = (modal.querySelector('#agentName') as HTMLInputElement)?.value;
+        const description = (modal.querySelector('#agentDesc') as HTMLInputElement)?.value;
+        const systemPrompt = (modal.querySelector('#agentPrompt') as HTMLTextAreaElement)?.value;
+        const providerId = (modal.querySelector('#agentProvider') as HTMLSelectElement)?.value;
+        const model = (modal.querySelector('#agentModel') as HTMLSelectElement)?.value;
+        if (!name) {
+          alert(this.store.getLocale() === 'en-US' ? 'Name is required' : '请填写名称');
+          return false;
+        }
+        await this.api.createAgent({ name, description, systemPrompt, providerId, model });
+        await this.onStatsChange();
+        return true;
+      },
+      () => this.bindProviderModelSync()
+    );
   }
 
-  private showEditModal(agent: any) {
+  private showEditModal(agent: Agent) {
     const providerId = this.resolveProviderId(agent.providerId);
-    this.createModal(t('common.edit'), `
+    this.createModal(
+      t('common.edit'),
+      `
       <div class="form-group">
         <label class="form-label">${t('agent.name')} *</label>
         <input type="text" class="input" id="agentName" value="${agent.name}">
@@ -169,22 +184,36 @@ export class AgentsView {
           ${this.renderModelOptions(providerId, agent.model)}
         </select>
       </div>
-    `, async (modal) => {
-      const name = (modal.querySelector('#agentName') as HTMLInputElement)?.value;
-      const description = (modal.querySelector('#agentDesc') as HTMLInputElement)?.value;
-      const systemPrompt = (modal.querySelector('#agentPrompt') as HTMLTextAreaElement)?.value;
-      const newProviderId = (modal.querySelector('#agentProvider') as HTMLSelectElement)?.value;
-      const model = (modal.querySelector('#agentModel') as HTMLSelectElement)?.value;
-      if (!name) {
-        alert(this.store.getLocale() === 'en-US' ? 'Name is required' : '请填写名称');
-        return false;
-      }
-      await this.api.updateAgent(agent.id, { name, description, systemPrompt, providerId: newProviderId, model });
-      return true;
-    }, () => this.bindProviderModelSync());
+    `,
+      async (modal) => {
+        const name = (modal.querySelector('#agentName') as HTMLInputElement)?.value;
+        const description = (modal.querySelector('#agentDesc') as HTMLInputElement)?.value;
+        const systemPrompt = (modal.querySelector('#agentPrompt') as HTMLTextAreaElement)?.value;
+        const newProviderId = (modal.querySelector('#agentProvider') as HTMLSelectElement)?.value;
+        const model = (modal.querySelector('#agentModel') as HTMLSelectElement)?.value;
+        if (!name) {
+          alert(this.store.getLocale() === 'en-US' ? 'Name is required' : '请填写名称');
+          return false;
+        }
+        await this.api.updateAgent(agent.id, {
+          name,
+          description,
+          systemPrompt,
+          providerId: newProviderId,
+          model,
+        });
+        return true;
+      },
+      () => this.bindProviderModelSync()
+    );
   }
 
-  private createModal(title: string, body: string, onSubmit: (modal: HTMLElement) => Promise<boolean>, onMount?: () => void) {
+  private createModal(
+    title: string,
+    body: string,
+    onSubmit: (modal: HTMLElement) => Promise<boolean>,
+    onMount?: () => void
+  ) {
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
     overlay.innerHTML = `
@@ -224,19 +253,25 @@ export class AgentsView {
     if (this.providers.length === 0) {
       return `<option value="">${t('common.empty')}</option>`;
     }
-    return this.providers.map(p =>
-      `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.name} (${p.type})</option>`
-    ).join('');
+    return this.providers
+      .map(
+        (p) =>
+          `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${p.name} (${p.type})</option>`
+      )
+      .join('');
   }
 
   private renderModelOptions(providerId?: string, selectedModel?: string) {
-    const provider = this.providers.find(p => p.id === providerId) || this.providers[0];
+    const provider = this.providers.find((p) => p.id === providerId) || this.providers[0];
     if (!provider || provider.models.length === 0) {
       return `<option value="">${t('common.empty')}</option>`;
     }
-    return provider.models.map(m =>
-      `<option value="${m.id}" ${m.id === selectedModel ? 'selected' : ''}>${m.name}</option>`
-    ).join('');
+    return provider.models
+      .map(
+        (m) =>
+          `<option value="${m.id}" ${m.id === selectedModel ? 'selected' : ''}>${m.name}</option>`
+      )
+      .join('');
   }
 
   private bindProviderModelSync() {
@@ -245,16 +280,16 @@ export class AgentsView {
     if (!providerSelect || !modelSelect) return;
 
     providerSelect.addEventListener('change', () => {
-      const provider = this.providers.find(p => p.id === providerSelect.value);
+      const provider = this.providers.find((p) => p.id === providerSelect.value);
       modelSelect.innerHTML = this.renderModelOptions(provider?.id, provider?.models[0]?.id);
     });
   }
 
   private resolveProviderId(providerId?: string): string | undefined {
     if (!providerId) return this.providers[0]?.id;
-    const byId = this.providers.find(p => p.id === providerId);
+    const byId = this.providers.find((p) => p.id === providerId);
     if (byId) return byId.id;
-    const byType = this.providers.find(p => p.type === providerId);
+    const byType = this.providers.find((p) => p.type === providerId);
     if (byType) return byType.id;
     return this.providers[0]?.id;
   }

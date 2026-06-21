@@ -8,8 +8,12 @@ global.fetch = vi.fn();
 if (typeof global.WeakRef === 'undefined') {
   (global as any).WeakRef = class WeakRef<T extends object> {
     private _target: T;
-    constructor(target: T) { this._target = target; }
-    deref(): T | undefined { return this._target; }
+    constructor(target: T) {
+      this._target = target;
+    }
+    deref(): T | undefined {
+      return this._target;
+    }
   };
 }
 
@@ -26,7 +30,7 @@ describe('ComponentLoader', () => {
       name: 'test-comp',
       type: 'component',
       src: 'test.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
     const comp = loader.getComponentById(id);
     expect(comp).toBeDefined();
@@ -43,7 +47,7 @@ describe('ComponentLoader', () => {
       name: 'hook-comp',
       type: 'component',
       src: 'hook.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
     const el = document.createElement('div');
     await loader.mountComponent(id, el);
@@ -61,7 +65,7 @@ describe('ComponentLoader', () => {
       name: 'unmount-comp',
       type: 'component',
       src: 'unmount.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
     const el = document.createElement('div');
     await loader.mountComponent(id, el);
@@ -76,16 +80,16 @@ describe('ComponentLoader', () => {
     let resolved = false;
     loader.registerLifecycle(id, {
       mount: async (el) => {
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise((r) => setTimeout(r, 10));
         el.textContent = 'mounted';
         resolved = true;
-      }
+      },
     });
     loader.registerRuntimeComponent({
       name: 'async-comp',
       type: 'component',
       src: 'async.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
     const el = document.createElement('div');
     await loader.mountComponent(id, el);
@@ -108,13 +112,13 @@ describe('ComponentLoader', () => {
       name: 'a',
       type: 'component',
       src: 'a.js',
-      metadata: { __plugin: 'plugin-a' }
+      metadata: { __plugin: 'plugin-a' },
     } as ComponentContribution);
     loader.registerRuntimeComponent({
       name: 'b',
       type: 'component',
       src: 'b.js',
-      metadata: { __plugin: 'plugin-b' }
+      metadata: { __plugin: 'plugin-b' },
     } as ComponentContribution);
     const pluginA = loader.getComponentsByPlugin('plugin-a');
     expect(pluginA.length).toBe(1);
@@ -124,7 +128,7 @@ describe('ComponentLoader', () => {
   it('should load component tree from API', async () => {
     (global.fetch as any).mockResolvedValue({
       ok: true,
-      json: async () => ({ root: [], relationships: [] })
+      json: async () => ({ root: [], relationships: [] }),
     });
     const loader = await import('../component-loader');
     const tree = await loader.loadComponentTree();
@@ -143,16 +147,18 @@ describe('ComponentLoader', () => {
       ok: true,
       json: async () => [
         { name: 'style', type: 'css', src: '/style.css', metadata: { __plugin: 'p' } },
-        { name: 'script', type: 'script', src: '/script.js', metadata: { __plugin: 'p' } }
-      ]
+        { name: 'script', type: 'script', src: '/script.js', metadata: { __plugin: 'p' } },
+      ],
     });
 
     // Mock script loading
     const originalCreateElement = document.createElement;
     const mockScript = document.createElement('script');
     Object.defineProperty(mockScript, 'onload', {
-      set(fn) { setTimeout(fn, 0); },
-      configurable: true
+      set(fn) {
+        setTimeout(fn, 0);
+      },
+      configurable: true,
     });
     document.createElement = vi.fn((tag: string) => {
       if (tag === 'script') return mockScript;
@@ -179,12 +185,12 @@ describe('ComponentLoader', () => {
       name: 'reloadable',
       type: 'component',
       src: 'reload.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
 
     (global.fetch as any).mockResolvedValue({
       ok: true,
-      json: async () => []
+      json: async () => [],
     });
 
     const result = await loader.reloadPluginComponents();
@@ -197,13 +203,13 @@ describe('ComponentLoader', () => {
       name: 'dup',
       type: 'component',
       src: 'dup.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
     loader.registerRuntimeComponent({
       name: 'dup',
       type: 'component',
       src: 'dup2.js',
-      metadata: { __plugin: 'runtime' }
+      metadata: { __plugin: 'runtime' },
     } as ComponentContribution);
     const comp = loader.getComponentById('runtime:dup');
     expect(comp?.src).toBe('dup2.js');

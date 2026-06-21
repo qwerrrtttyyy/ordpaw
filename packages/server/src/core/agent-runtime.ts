@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { Agent, Message, Provider, McpConfig } from '@ordpaw/shared';
+import type { BindParams } from 'sql.js';
 import { OrdPawError, OrdPawErrorCode } from '@ordpaw/shared/errors.js';
 import { getDatabase, saveDatabase } from '../db/index.js';
 import { sessionManager } from './session.js';
@@ -374,7 +375,7 @@ export class AgentRuntime {
       updates.push('updated_at = ?');
       params.push(Date.now());
       params.push(id);
-      db.run(`UPDATE agents SET ${updates.join(', ')} WHERE id = ?`, params);
+      db.run(`UPDATE agents SET ${updates.join(', ')} WHERE id = ?`, params as BindParams);
       saveDatabase();
       agentCache.delete(id);
     }

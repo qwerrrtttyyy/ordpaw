@@ -13,6 +13,19 @@ export enum OrdPawErrorCode {
   API_ERROR = 'API_ERROR',
 }
 
+export enum ErrorCode {
+  CONFIG_ERROR = 'CONFIG_ERROR',
+  DB_ERROR = 'DB_ERROR',
+  MCP_ERROR = 'MCP_ERROR',
+  PLUGIN_ERROR = 'PLUGIN_ERROR',
+  SKILL_ERROR = 'SKILL_ERROR',
+  COMPONENT_ERROR = 'COMPONENT_ERROR',
+  AGENT_ERROR = 'AGENT_ERROR',
+  SCRIPT_ERROR = 'SCRIPT_ERROR',
+  DOWNLOAD_ERROR = 'DOWNLOAD_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+}
+
 export interface OrdPawErrorOptions {
   status?: number;
   code?: OrdPawErrorCode | string;
@@ -38,4 +51,25 @@ export class OrdPawError extends Error {
   }
 }
 
-export type ErrorCode = Lowercase<OrdPawErrorCode> | string;
+export class OrdPawApiError extends Error {
+  readonly code: string;
+  readonly statusCode: number;
+  readonly details?: unknown;
+
+  constructor(code: string, message: string, statusCode: number = 500, details?: unknown) {
+    super(message);
+    this.name = 'OrdPawApiError';
+    this.code = code;
+    this.statusCode = statusCode;
+    this.details = details;
+  }
+}
+
+export function createApiError(
+  code: string,
+  message: string,
+  statusCode?: number,
+  details?: unknown
+): OrdPawApiError {
+  return new OrdPawApiError(code, message, statusCode, details);
+}

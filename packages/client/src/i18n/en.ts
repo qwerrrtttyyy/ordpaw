@@ -4,7 +4,8 @@ export const en: Record<I18nKey, string> = {
   'app.name': 'OrdPaw',
   'app.tag': 'Agent Studio',
   'app.welcome.title': 'Welcome to OrdPaw',
-  'app.welcome.subtitle': 'A simple, warm, organic AI Agent workbench. Build, debug, and manage your agents, connect Skills and MCP protocols.',
+  'app.welcome.subtitle':
+    'A simple, warm, organic AI Agent workbench. Build, debug, and manage your agents, connect Skills and MCP protocols.',
   'app.welcome.createAgent': 'Create Agent',
   'app.welcome.newConversation': 'New Conversation',
   'nav.workspace': 'Workspace',
@@ -74,7 +75,8 @@ export const en: Record<I18nKey, string> = {
   'provider.type': 'Type',
   'provider.models': 'Models',
   'provider.name': 'Provider Name',
-  'provider.description': 'Freely configure OpenAI, Anthropic, Ollama or any custom OpenAI-compatible API provider.',
+  'provider.description':
+    'Freely configure OpenAI, Anthropic, Ollama or any custom OpenAI-compatible API provider.',
   'provider.deleteConfirm': 'Delete this provider?',
   'conversation.title': 'Conversations',
   'conversation.new': 'New Conversation',
@@ -86,7 +88,8 @@ export const en: Record<I18nKey, string> = {
   'conversation.emptyHint': 'Pick an agent to start chatting',
   'conversation.createAgentFirst': 'Create an agent before starting a conversation',
   'conversation.unlinked': 'Unlinked',
-  'conversation.deleteConfirm': 'Delete this conversation? All messages and checkpoints will be lost.',
+  'conversation.deleteConfirm':
+    'Delete this conversation? All messages and checkpoints will be lost.',
   'conversation.titleOptional': 'Conversation title (optional)',
   'conversation.newSession': 'New session',
   'plugin.title': 'Plugins',
@@ -94,7 +97,8 @@ export const en: Record<I18nKey, string> = {
   'plugin.loaded': 'Loaded',
   'plugin.description': 'Extend agent capabilities via event-driven hooks',
   'plugin.guide': 'Plugin Development Guide',
-  'plugin.guideDesc': 'Plugins are written in JavaScript and interact with the system via the event bus.',
+  'plugin.guideDesc':
+    'Plugins are written in JavaScript and interact with the system via the event bus.',
   'plugin.guidePath': 'Place under',
   'plugin.guidePath2': 'directory, with a',
   'plugin.guidePath3': 'manifest and entry file.',

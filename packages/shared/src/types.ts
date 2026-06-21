@@ -300,7 +300,15 @@ export interface DebugEventEntry {
   payload: unknown;
 }
 
-export type ThemeId = 'ordpaw-light' | 'ordpaw-dark' | 'ordpaw-twilight' | 'minimal' | 'forest' | 'ocean' | 'neon' | 'material';
+export type ThemeId =
+  | 'ordpaw-light'
+  | 'ordpaw-dark'
+  | 'ordpaw-twilight'
+  | 'minimal'
+  | 'forest'
+  | 'ocean'
+  | 'neon'
+  | 'material';
 export type Locale = 'zh-CN' | 'en-US';
 export type PerformanceTier = 'auto' | 'high' | 'medium' | 'low';
 
@@ -381,7 +389,13 @@ export interface StorageQuota {
   serverPath?: string;
 }
 
-export type DownloadTaskStatus = 'pending' | 'running' | 'paused' | 'completed' | 'failed' | 'cancelled';
+export type DownloadTaskStatus =
+  | 'pending'
+  | 'running'
+  | 'paused'
+  | 'completed'
+  | 'failed'
+  | 'cancelled';
 
 export interface DownloadItem {
   id: string;

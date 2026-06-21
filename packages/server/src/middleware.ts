@@ -19,7 +19,12 @@ export function asyncHandler<T = unknown>(
 export class ApiError extends OrdPawError {
   public statusCode: number;
 
-  constructor(statusCode: number, message: string, code: string = OrdPawErrorCode.API_ERROR, details?: unknown) {
+  constructor(
+    statusCode: number,
+    message: string,
+    code: string = OrdPawErrorCode.API_ERROR,
+    details?: unknown
+  ) {
     super(message, { status: statusCode, code, details });
     this.name = 'ApiError';
     this.statusCode = statusCode;
@@ -50,22 +55,28 @@ export function errorHandler(
   const timestamp = new Date().toISOString();
 
   if (err instanceof ApiError) {
-    logger.error({ code: err.code, path: req.path, method: req.method, details: err.details }, `[${timestamp}] ${err.code} ${req.method} ${req.path}: ${err.message}`);
+    logger.error(
+      { code: err.code, path: req.path, method: req.method, details: err.details },
+      `[${timestamp}] ${err.code} ${req.method} ${req.path}: ${err.message}`
+    );
     if (err.details) logger.error({ details: err.details }, '  details:');
     res.status(err.statusCode).json({
       error: err.message,
       code: err.code,
-      details: err.details
+      details: err.details,
     });
     return;
   }
 
   // 未预期错误
-  logger.error({ err, path: req.path, method: req.method }, `[${timestamp}] UNEXPECTED ${req.method} ${req.path}:`);
+  logger.error(
+    { err, path: req.path, method: req.method },
+    `[${timestamp}] UNEXPECTED ${req.method} ${req.path}:`
+  );
   res.status(500).json({
     error: '服务器内部错误',
     code: 'INTERNAL_ERROR',
-    message: process.env.NODE_ENV === 'production' ? undefined : err.message
+    message: process.env.NODE_ENV === 'production' ? undefined : err.message,
   });
 }
 
@@ -94,7 +105,9 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 /**
  * 简单的请求体验证
  */
-export function validateBody<T>(schema: Partial<Record<keyof T, 'string' | 'number' | 'boolean' | 'object' | 'array'>>) {
+export function validateBody<T>(
+  schema: Partial<Record<keyof T, 'string' | 'number' | 'boolean' | 'object' | 'array'>>
+) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const body = req.body || {};
     const errors: string[] = [];
@@ -131,6 +144,6 @@ export function notFoundHandler(req: Request, res: Response) {
   res.status(404).json({
     error: '路由不存在',
     code: 'ROUTE_NOT_FOUND',
-    path: req.path
+    path: req.path,
   });
 }
