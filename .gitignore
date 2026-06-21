@@ -8,3 +8,4 @@ data/
 plugins/
 *.tsbuildinfo
 .turbo
+.pnpm-store/
